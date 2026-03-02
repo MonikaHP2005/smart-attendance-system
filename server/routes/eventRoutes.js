@@ -1,61 +1,23 @@
-import express from "express";
-import db from "../config/db.js";
+import express from 'express';
+import { getAllEvents, generateQR, markAttendance, getStudentStats } from '../controllers/eventController.js';
 
 const router = express.Router();
 
-/* ==============================
-   CREATE EVENT
-   POST /api/events
-============================== */
-router.post("/events", async(req, res) => {
-    const { name, date, description } = req.body;
+// GET request to fetch all NGO activities
+// URL: http://localhost:5000/api/events
+router.get('/', getAllEvents);
 
-    try {
-        const [result] = await db.execute(
-            "INSERT INTO events (name, date, description) VALUES (?, ?, ?)", [name, date, description]
-        );
+// POST request to turn on the QR code and set the GPS location
+// URL: http://localhost:5000/api/events/:id/generate-qr
+router.post('/:id/generate-qr', generateQR);
 
-        res.status(201).json({
-            message: "Event created successfully",
-            eventId: result.insertId,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Database error" });
-    }
-});
+// POST request for a student to scan and check in
+// URL: http://localhost:5000/api/events/attend
+router.post('/attend', markAttendance);
 
-/* ==============================
-   GET ALL EVENTS
-   GET /api/events
-============================== */
-router.get("/events", async(req, res) => {
-    try {
-        const [rows] = await db.execute(
-            "SELECT * FROM events ORDER BY created_at DESC"
-        );
+// GET request to fetch a student's attendance percentage and history
+// URL: http://localhost:5000/api/events/student-stats/1
+router.get('/student-stats/:studentId', getStudentStats);
 
-        res.status(200).json(rows);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Database error" });
-    }
-});
-
-/* ==============================
-   DELETE EVENT
-   DELETE /api/events/:id
-============================== */
-router.delete("/events/:id", async(req, res) => {
-    const { id } = req.params;
-
-    try {
-        await db.execute("DELETE FROM events WHERE id = ?", [id]);
-        res.json({ message: "Event deleted successfully" });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Database error" });
-    }
-});
 
 export default router;

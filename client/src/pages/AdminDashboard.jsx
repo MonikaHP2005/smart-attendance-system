@@ -1,245 +1,225 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [events, setEvents] = useState([]); // Now starts completely empty!
   const [qrToken, setQrToken] = useState("");
+  const [activeEventName, setActiveEventName] = useState("");
   const [attendanceCount, setAttendanceCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  const events = [
-    { id: 1, name: "FCI Education Workshop", date: "2026-02-25", status: "Upcoming" },
-    { id: 2, name: "FCI Health Camp", date: "2026-03-10", status: "Active" },
-    { id: 3, name: "FCI Awareness Program", date: "2025-01-10", status: "Closed" },
-  ];
+  // ==========================================
+  // 1. FETCH REAL DATA FROM MYSQL ON LOAD
+  // ==========================================
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/events");
+        const data = await response.json();
+        
+        if (response.ok) {
+          setEvents(data);
+        } else {
+          toast.error("Failed to load NGO activities.");
+        }
+      } catch (error) {
+        toast.error("Cannot connect to server.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const generateQR = (event) => {
-    const token = JSON.stringify({
-      eventId: event.id,
-      name: event.name,
-      lat: 13.005212,
-      lon: 77.546086,
-      time: Date.now(),
-    });
+    fetchEvents();
+  }, []); // The empty array means this runs exactly once when the page loads
 
-    setQrToken(token);
-    setAttendanceCount((prev) => prev + 1);
-    toast.success("QR Generated Successfully!");
-  };
+  // ==========================================
+  // 2. GENERATE GEOFENCED QR CODE
+  // ==========================================
+  const handleGenerateQR = async (event) => {
+    // Check if the browser supports GPS tracking
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser!");
+      return;
+    }
 
-  const getStatusStyle = (status) => {
-    if (status === "Active") return "bg-green-100 text-green-700";
-    if (status === "Upcoming") return "bg-yellow-100 text-yellow-700";
-    return "bg-red-100 text-red-700";
+    toast.loading("Locking GPS Coordinates...", { id: "gps-toast" });
+
+    // Get the Admin's physical location
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        try {
+          // Send the GPS data to your Node.js backend
+          const response = await fetch(`http://localhost:5000/api/events/${event.id}/generate-qr`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ latitude, longitude }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            toast.success("Geofence Locked! QR Live.", { id: "gps-toast" });
+            
+            // We package the Event ID and the Secure Token together so the student's phone knows what it is scanning!
+            const qrPayload = JSON.stringify({
+              eventId: event.id,
+              token: data.qrToken
+            });
+
+            setQrToken(qrPayload);
+            setActiveEventName(event.title);
+            setAttendanceCount(0); // Reset live counter
+          } else {
+            toast.error(data.message || "Failed to generate QR.", { id: "gps-toast" });
+          }
+        } catch (error) {
+          toast.error("Server error while generating QR.", { id: "gps-toast" });
+        }
+      },
+      (error) => {
+        toast.error("Please allow location access to generate the QR!", { id: "gps-toast" });
+      }
+    );
   };
 
   const filteredEvents = events.filter((event) =>
-    event.name.toLowerCase().includes(searchTerm.toLowerCase())
+    event.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="flex min-h-screen bg-blue-50">
+      <Toaster position="top-right" /> {/* Allows the toast notifications to show */}
 
-      {/* Sidebar */}
+      {/* Sidebar (Kept exactly as your teammate designed it) */}
       <div className="w-64 bg-white shadow-lg p-6">
-        <h2 className="text-xl font-bold text-blue-700 mb-6">
-          FCI Admin
-        </h2>
-
+        <h2 className="text-xl font-bold text-blue-700 mb-6">FCI Admin</h2>
         <nav className="space-y-4">
           <button onClick={() => setActiveTab("dashboard")} className={`w-full text-left p-2 rounded-lg ${activeTab === "dashboard" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"}`}>
             📊 Dashboard
           </button>
-
           <button onClick={() => setActiveTab("events")} className={`w-full text-left p-2 rounded-lg ${activeTab === "events" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"}`}>
-            📅 Events
-          </button>
-
-          <button onClick={() => setActiveTab("analytics")} className={`w-full text-left p-2 rounded-lg ${activeTab === "analytics" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"}`}>
-            📈 Analytics
-          </button>
-
-          <button onClick={() => setActiveTab("settings")} className={`w-full text-left p-2 rounded-lg ${activeTab === "settings" ? "bg-blue-100 text-blue-700" : "hover:bg-gray-100"}`}>
-            ⚙ Settings
+            📅 Activities
           </button>
         </nav>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 p-10">
-
-        {/* DASHBOARD */}
-        {activeTab === "dashboard" && (
+        
+        {loading ? (
+          <div className="text-center text-xl text-gray-500 mt-20">Loading NGO Data from Database...</div>
+        ) : (
           <>
-            <h1 className="text-2xl font-bold text-blue-700 mb-8">
-              Admin Dashboard
-            </h1>
+            {/* DASHBOARD TAB */}
+            {activeTab === "dashboard" && (
+              <>
+                <h1 className="text-2xl font-bold text-blue-700 mb-8">Admin Dashboard</h1>
 
-            <div className="grid grid-cols-3 gap-6 mb-10">
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Total Events</h3>
-                <p className="text-3xl font-bold text-blue-700">{events.length}</p>
-              </div>
-
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Active Events</h3>
-                <p className="text-3xl font-bold text-green-600">
-                  {events.filter(e => e.status === "Active").length}
-                </p>
-              </div>
-
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Total Attendance</h3>
-                <p className="text-3xl font-bold text-indigo-600">{attendanceCount}</p>
-              </div>
-            </div>
-
-            {events.map((event) => (
-              <div key={event.id} className="bg-white shadow-md rounded-xl p-6 mb-4 flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold text-lg">{event.name}</h3>
-                  <p className="text-gray-500 text-sm">{event.date}</p>
-                  <span className={`mt-2 inline-block px-3 py-1 text-sm rounded-full ${getStatusStyle(event.status)}`}>
-                    {event.status}
-                  </span>
+                {/* Database-Driven Cards */}
+                <div className="grid grid-cols-3 gap-6 mb-10">
+                  <div className="bg-white shadow-md rounded-xl p-6 text-center">
+                    <h3 className="text-gray-500">Total Scheduled</h3>
+                    <p className="text-3xl font-bold text-blue-700">{events.length}</p>
+                  </div>
+                  <div className="bg-white shadow-md rounded-xl p-6 text-center">
+                    <h3 className="text-gray-500">Classes</h3>
+                    <p className="text-3xl font-bold text-green-600">
+                      {events.filter(e => e.activity_type === 'CLASS').length}
+                    </p>
+                  </div>
+                  <div className="bg-white shadow-md rounded-xl p-6 text-center">
+                    <h3 className="text-gray-500">Events & Outbound</h3>
+                    <p className="text-3xl font-bold text-indigo-600">
+                      {events.filter(e => e.activity_type !== 'CLASS').length}
+                    </p>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => generateQR(event)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-                >
-                  Generate QR
-                </button>
-              </div>
-            ))}
+                {/* Dynamic Event List */}
+                {events.slice(0, 3).map((event) => (
+                  <div key={event.id} className="bg-white shadow-md rounded-xl p-6 mb-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-semibold text-lg">{event.title}</h3>
+                      <p className="text-gray-500 text-sm">
+                        {new Date(event.start_time).toLocaleString()} | {event.instructor_name}
+                      </p>
+                      <span className="mt-2 inline-block px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-700 font-medium">
+                        {event.activity_type}
+                      </span>
+                    </div>
 
-            {qrToken && (
-              <div className="bg-white shadow-lg rounded-xl p-6 mt-8 text-center">
-                <h3 className="text-lg font-semibold text-blue-700 mb-4">
-                  Live QR Code
-                </h3>
-                <div className="flex justify-center">
-                  <QRCodeCanvas value={qrToken} size={200} />
+                    <button
+                      onClick={() => handleGenerateQR(event)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition"
+                    >
+                      Generate QR
+                    </button>
+                  </div>
+                ))}
+
+                {/* The Live QR Code Display */}
+                {qrToken && (
+                  <div className="bg-white shadow-2xl rounded-xl p-8 mt-8 text-center border-2 border-blue-500">
+                    <h3 className="text-2xl font-bold text-blue-700 mb-2">
+                      Live Attendance: {activeEventName}
+                    </h3>
+                    <p className="text-gray-500 mb-6">Scan with the Student Portal to check in.</p>
+                    
+                    <div className="flex justify-center bg-white p-4 rounded-lg inline-block">
+                      <QRCodeCanvas value={qrToken} size={250} level={"H"} />
+                    </div>
+                    
+                    <p className="mt-6 text-green-600 font-bold text-xl">
+                      Students Checked In: {attendanceCount}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* EVENTS TAB (Updated to show real database fields) */}
+            {activeTab === "events" && (
+              <>
+                <h1 className="text-2xl font-bold text-blue-700 mb-6">NGO Activity Management</h1>
+                <input
+                  type="text"
+                  placeholder="Search activities..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full max-w-md p-3 border rounded-lg shadow-sm mb-6 focus:ring-2 focus:ring-blue-500"
+                />
+
+                <div className="bg-white shadow-md rounded-xl overflow-hidden">
+                  <table className="w-full">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="p-3 text-left">Activity Title</th>
+                        <th className="p-3 text-left">Type</th>
+                        <th className="p-3 text-left">Instructor</th>
+                        <th className="p-3 text-left">Date & Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredEvents.map((event) => (
+                        <tr key={event.id} className="border-b hover:bg-gray-50 transition">
+                          <td className="p-3 font-medium">{event.title}</td>
+                          <td className="p-3 text-sm text-gray-600">{event.activity_type}</td>
+                          <td className="p-3">{event.instructor_name}</td>
+                          <td className="p-3 text-sm">{new Date(event.start_time).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <p className="mt-4 text-blue-600 font-semibold">
-                  Live Attendance Count: {attendanceCount}
-                </p>
-              </div>
+              </>
             )}
           </>
         )}
-
-        {/* EVENTS TAB */}
-        {activeTab === "events" && (
-          <>
-            <h1 className="text-2xl font-bold text-blue-700 mb-6">
-              Event Management
-            </h1>
-
-            <input
-              type="text"
-              placeholder="Search events..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full max-w-md p-3 border rounded-lg shadow-sm mb-6"
-            />
-
-            <div className="bg-white shadow-md rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-blue-600 text-white">
-                  <tr>
-                    <th className="p-3 text-left">Event</th>
-                    <th className="p-3 text-left">Date</th>
-                    <th className="p-3 text-left">Status</th>
-                    <th className="p-3 text-left">Registrations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEvents.map((event) => (
-                    <tr key={event.id} className="border-b">
-                      <td className="p-3">{event.name}</td>
-                      <td className="p-3">{event.date}</td>
-                      <td className="p-3">
-                        <span className={`px-3 py-1 text-sm rounded-full ${getStatusStyle(event.status)}`}>
-                          {event.status}
-                        </span>
-                      </td>
-                      <td className="p-3">{Math.floor(Math.random() * 150)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {/* ANALYTICS TAB */}
-        {activeTab === "analytics" && (
-          <>
-            <h1 className="text-2xl font-bold text-blue-700 mb-6">
-              Attendance Analytics
-            </h1>
-
-            <div className="grid grid-cols-3 gap-6 mb-10">
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Total Attendance</h3>
-                <p className="text-3xl font-bold text-blue-700">{attendanceCount}</p>
-              </div>
-
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Average Attendance</h3>
-                <p className="text-3xl font-bold text-green-600">
-                  {Math.floor(attendanceCount / events.length)}
-                </p>
-              </div>
-
-              <div className="bg-white shadow-md rounded-xl p-6 text-center">
-                <h3 className="text-gray-500">Growth Rate</h3>
-                <p className="text-3xl font-bold text-indigo-600">
-                  +{Math.floor(Math.random() * 30)}%
-                </p>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* SETTINGS TAB (FULL PROFESSIONAL CONTENT ADDED) */}
-        {activeTab === "settings" && (
-          <div className="space-y-8">
-            <h1 className="text-2xl font-bold text-blue-700">
-              System Settings
-            </h1>
-
-            {/* Organization */}
-            <div className="bg-white shadow-md rounded-xl p-6 space-y-4">
-              <h3 className="text-lg font-semibold">🏢 Organization Settings</h3>
-              <input type="text" placeholder="Organization Name" className="w-full border p-2 rounded" />
-              <input type="email" placeholder="Admin Email" className="w-full border p-2 rounded" />
-              <input type="text" placeholder="Contact Number" className="w-full border p-2 rounded" />
-            </div>
-
-            {/* Location */}
-            <div className="bg-white shadow-md rounded-xl p-6 space-y-4">
-              <h3 className="text-lg font-semibold">📍 Location Settings</h3>
-              <input type="number" placeholder="Default Latitude" className="w-full border p-2 rounded" />
-              <input type="number" placeholder="Default Longitude" className="w-full border p-2 rounded" />
-              <input type="number" placeholder="Allowed Radius (meters)" className="w-full border p-2 rounded" />
-            </div>
-
-            {/* QR Settings */}
-            <div className="bg-white shadow-md rounded-xl p-6 space-y-4">
-              <h3 className="text-lg font-semibold">⚙ QR Configuration</h3>
-              <input type="number" placeholder="QR Refresh Interval (seconds)" className="w-full border p-2 rounded" />
-              <input type="number" placeholder="QR Expiry Time (minutes)" className="w-full border p-2 rounded" />
-            </div>
-
-            <button className="bg-blue-700 text-white px-6 py-3 rounded-lg">
-              Save Settings
-            </button>
-          </div>
-        )}
-
       </div>
     </div>
   );
