@@ -1,68 +1,78 @@
-import db from './config/db.js';
+import bcrypt from 'bcryptjs';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
 
-const seedDummyData = async () => {
+dotenv.config();
+
+// 1. Direct connection to your database
+const db = await mysql.createConnection({
+    host: 'localhost',
+    user: 'root',      
+    password: '645767',      
+    database: 'smart_attendance' 
+});
+
+const seedDummyEvents = async () => {
     try {
         console.log("Connecting to DB to seed NGO activities...");
 
-        // 1. Get the Admin ID we created earlier
-        // We need this so the database knows WHO is managing these events
-        const [admins] = await db.query("SELECT id FROM users WHERE email = 'monikahp005@gmail.com'");
+        // 2. Look for the Admin who is "creating" these events
+        // We search by the email you used in your earlier Admin creation
+        const [admins] = await db.query("SELECT id FROM users WHERE role = 'admin' LIMIT 1");
+        
         if (admins.length === 0) {
-            console.log("⚠️ Error: Admin not found. Did you run createAdmin.js?");
+            console.log("⚠️ Error: No Admin found in the 'users' table.");
+            console.log("Please run your createAdmin.js script first so we have a 'creator' for these events.");
             process.exit(1);
         }
-        const adminId = admins[0].id;
+        
+        const creatorId = admins[0].id; // This will be 'ADMIN-001' or similar
+        console.log(`Found Creator Admin ID: ${creatorId}`);
 
-        // 2. Clear out any old test data for a fresh start
+        // 3. Clear existing events for a clean test environment
         await db.query("SET FOREIGN_KEY_CHECKS = 0;");
         await db.query("TRUNCATE TABLE attendance;");
         await db.query("TRUNCATE TABLE events;");
         await db.query("SET FOREIGN_KEY_CHECKS = 1;");
 
-        // 3. Define our NGO Activities (Classes, Events, and Outbound)
+        // 4. Define the Activities
         const activities = [
             {
-                external_event_id: 'NGO-CLS-001',
-                activity_code: 'DSA-101',
+                title: 'Introduction to Web Dev',
                 activity_type: 'CLASS',
-                title: 'DSA',
-                instructor_name: 'Dr. Smith ',
-                managed_by_admin_id: adminId,
-                start_time: '2026-03-02 10:00:00', // Today
-                end_time: '2026-03-02 12:00:00'
+                instructor_id: creatorId, 
+                instructor_name: 'Dr. Monika',
+                start_time: '2026-03-05 10:00:00', 
+                end_time: '2026-03-05 12:00:00'
             },
             {
-                external_event_id: 'NGO-EVT-002',
-                activity_code: 'Evt-102',
+                title: 'Annual NGO Workshop',
                 activity_type: 'EVENT',
-                title: 'Cultural Fest',
-                instructor_name: 'FCI_team',
-                managed_by_admin_id: adminId,
-                start_time: '2026-03-03 09:00:00', // Tomorrow
-                end_time: '2026-03-03 17:00:00'
+                instructor_id: creatorId,
+                instructor_name: 'FCI Core Team',
+                start_time: '2026-03-06 09:00:00',
+                end_time: '2026-03-06 17:00:00'
             },
             {
-                external_event_id: 'NGO-OUT-003',
-                activity_code: 'FIELD-TRIP',
+                title: 'Field Visit: Water Plant',
                 activity_type: 'OUTBOUND',
-                title: 'Wonderla Industrial Visit',
-                instructor_name: 'Ranger Dave',
-                managed_by_admin_id: adminId,
-                start_time: '2026-03-05 08:00:00', // Next Week
-                end_time: '2026-03-05 15:00:00'
+                instructor_id: creatorId,
+                instructor_name: 'Industrial Guide',
+                start_time: '2026-03-10 08:00:00',
+                end_time: '2026-03-10 15:00:00'
             }
         ];
 
-        // 4. Insert them into your MySQL Database
+        // 5. Insert into the 'events' table
         for (let act of activities) {
             await db.execute(
-                `INSERT INTO events (external_event_id, activity_code, activity_type, title, instructor_name, managed_by_admin_id, start_time, end_time)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [act.external_event_id, act.activity_code, act.activity_type, act.title, act.instructor_name, act.managed_by_admin_id, act.start_time, act.end_time]
+                `INSERT INTO events (title, activity_type, instructor_id, instructor_name, start_time, end_time)
+                 VALUES (?, ?, ?, ?, ?, ?)`,
+                [act.title, act.activity_type, act.instructor_id, act.instructor_name, act.start_time, act.end_time]
             );
         }
 
-        console.log("✅ Dummy NGO Activities seeded successfully!");
+        console.log("✅ 3 Dummy NGO Activities seeded successfully!");
         process.exit(0);
     } catch (error) {
         console.error("❌ Error seeding data:", error);
@@ -70,4 +80,4 @@ const seedDummyData = async () => {
     }
 };
 
-seedDummyData();
+seedDummyEvents();

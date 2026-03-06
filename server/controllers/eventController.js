@@ -20,30 +20,36 @@ export const getAllEvents = async (req, res) => {
 // ==========================================
 export const generateQR = async (req, res) => {
     try {
-        const { id } = req.params; // The ID of the event in the URL
-        const { latitude, longitude } = req.body; // The Admin's GPS location sent from React
+        const { id } = req.params; 
+        const { latitude, longitude } = req.body; 
 
-        // 1. Create a secure, random 32-character token
+        const [events] = await db.query('SELECT * FROM events WHERE id = ?', [id]);
+        if (events.length === 0) return res.status(404).json({ message: "Event not found." });
+
+        const event = events[0];
+
+        // 🚨 NEW FIX: Prevent generating if the event time has already passed!
+        if (new Date() > new Date(event.end_time)) {
+            return res.status(403).json({ 
+                message: "This event has already ended. You cannot generate a QR code for it." 
+            });
+        }
+
+        if (!event.is_active && event.qr_token) {
+            return res.status(403).json({ 
+                message: "This event has already been completed. You cannot generate a new QR code." 
+            });
+        }
+
+        const crypto = await import('crypto');
         const secureToken = crypto.randomBytes(16).toString('hex');
 
-        // 2. Update the event in the database with the token and the GPS location
-        // We also set is_active = TRUE so students can now scan it
-        const [result] = await db.execute(
-            `UPDATE events 
-             SET qr_token = ?, latitude = ?, longitude = ?, is_active = TRUE 
-             WHERE id = ?`,
+        await db.query(
+            `UPDATE events SET qr_token = ?, latitude = ?, longitude = ?, is_active = TRUE WHERE id = ?`,
             [secureToken, latitude, longitude, id]
         );
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Event not found." });
-        }
-
-        // 3. Send the token back to React so it can draw the QR code on the screen
-        res.status(200).json({ 
-            message: "QR Code Generated & Geofence Locked!", 
-            qrToken: secureToken 
-        });
+        res.status(200).json({ message: "QR Code Generated!", qrToken: secureToken });
 
     } catch (error) {
         console.error("Error generating QR:", error);
@@ -68,38 +74,38 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 };
 
 // ==========================================
-// 3. STUDENT SCAN & ATTENDANCE LOGIC
-// ==========================================
-// ==========================================
 // 3. STUDENT SCAN (CHECK-IN & CHECK-OUT LOGIC)
 // ==========================================
 export const markAttendance = async (req, res) => {
     try {
+        console.log("\n==============================");
+        console.log("📸 NEW QR SCAN DETECTED!");
+        console.log("Data received from phone:", req.body);
+
         const { eventId, qrToken, studentLat, studentLon, studentId } = req.body;
 
-        // 1. Validate Event & Token
+        if (!studentId) {
+            console.log("❌ ERROR: studentId is missing!");
+            return res.status(400).json({ message: "Student ID missing. Please log out and log back in." });
+        }
+
+        // 1. Validate Event
         const [events] = await db.query('SELECT * FROM events WHERE id = ? AND is_active = TRUE', [eventId]);
         if (events.length === 0) return res.status(400).json({ message: "This QR code is no longer active." });
         
         const event = events[0];
         if (event.qr_token !== qrToken) return res.status(403).json({ message: "Invalid or expired QR Token!" });
 
-        // 2. Geofence Validation
-        const distance = calculateDistance(event.latitude, event.longitude, studentLat, studentLon);
-        if (distance > event.radius) {
-            return res.status(403).json({ 
-                message: `You are ${Math.round(distance)} meters away. You must be within ${event.radius} meters of the classroom.` 
-            });
-        }
-
-        // 3. Check-In vs Check-Out Logic
+        // 2. Check-In vs Check-Out Logic
         const [existing] = await db.query(
             'SELECT * FROM attendance WHERE student_id = ? AND event_id = ?',
             [studentId, eventId]
         );
 
+        console.log("🔍 Did we find them in the database?", existing.length > 0 ? "YES" : "NO");
+
         if (existing.length === 0) {
-            // SCENARIO A: First time scanning -> CHECK IN
+            console.log("➡️ SCENARIO A: Database is empty for this student. Checking them IN.");
             await db.execute(
                 `INSERT INTO attendance (student_id, event_id, check_in_time, status) 
                  VALUES (?, ?, NOW(), 'PRESENT')`,
@@ -109,26 +115,40 @@ export const markAttendance = async (req, res) => {
             
         } else {
             const record = existing[0];
+            console.log("📊 Existing Record Details:", record);
             
             if (record.check_out_time === null) {
-                // SCENARIO B: Scanned again -> CHECK OUT
+                // Time-lock check
+                const [timeCheck] = await db.query(
+                    `SELECT TIMESTAMPDIFF(SECOND, check_in_time, NOW()) as seconds_passed FROM attendance WHERE id = ?`,
+                    [record.id]
+                );
+                
+                const secondsPassed = timeCheck[0].seconds_passed;
+                console.log(`⏱️ Seconds since check-in: ${secondsPassed}`);
+
+                if (secondsPassed < 60) {
+                    console.log("⚠️ Camera double-fired within 60s. Ignoring safely.");
+                    return res.status(200).json({ action: "CHECK_IN", message: "Checked In Successfully!" });
+                }
+
+                console.log("⬅️ SCENARIO B: Time passed. Checking them OUT.");
                 await db.execute(
                     `UPDATE attendance 
-                     SET check_out_time = NOW(), 
-                         duration_minutes = TIMESTAMPDIFF(MINUTE, check_in_time, NOW())
+                     SET check_out_time = NOW(), duration_minutes = TIMESTAMPDIFF(MINUTE, check_in_time, NOW())
                      WHERE id = ?`,
                     [record.id]
                 );
                 return res.status(200).json({ action: "CHECK_OUT", message: "Checked Out Successfully!" });
                 
             } else {
-                // SCENARIO C: Already checked out
+                console.log("🛑 SCENARIO C: They already have a checkout time!");
                 return res.status(400).json({ message: "You have already checked out of this event." });
             }
         }
 
     } catch (error) {
-        console.error("Error marking attendance:", error);
+        console.error("🔥 CRITICAL BACKEND ERROR:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };
@@ -167,6 +187,64 @@ export const getStudentStats = async (req, res) => {
 
     } catch (error) {
         console.error("Error fetching student stats:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+};
+
+
+// ==========================================
+// 5. CLOSE EVENT & AUTO-CHECKOUT
+// ==========================================
+export const closeEvent = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // 1. Turn off the QR code
+        await db.query('UPDATE events SET is_active = FALSE WHERE id = ?', [id]);
+
+        // 2. Fetch the end time manually to avoid the MySQL "UPDATE JOIN" deadlock bug
+        const [eventData] = await db.query('SELECT end_time FROM events WHERE id = ?', [id]);
+        
+        if (eventData.length > 0) {
+            const endTime = eventData[0].end_time;
+
+            // 3. Safely update all missing checkouts using standard SQL
+            await db.query(
+                `UPDATE attendance 
+                 SET check_out_time = ?, 
+                     duration_minutes = TIMESTAMPDIFF(MINUTE, check_in_time, ?)
+                 WHERE event_id = ? AND check_out_time IS NULL`,
+                [endTime, endTime, id]
+            );
+        }
+
+        res.status(200).json({ message: "Event closed and attendance finalized!" });
+    } catch (error) {
+        console.error("🔥 Error closing event:", error);
+        res.status(500).json({ message: "Database Error while closing event" });
+    }
+};
+
+
+// ==========================================
+// 6. GET ATTENDANCE FOR A SPECIFIC EVENT
+// ==========================================
+export const getEventAttendance = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const [records] = await db.query(`
+            SELECT a.id, a.check_in_time, a.check_out_time, a.duration_minutes, a.status, 
+                   u.name, u.id as student_id
+            FROM attendance a
+            JOIN users u ON a.student_id = u.id
+            WHERE a.event_id = ?
+            ORDER BY a.check_in_time DESC
+        `, [id]);
+
+        res.status(200).json(records);
+    } catch (error) {
+        console.error("Error fetching event attendance:", error);
         res.status(500).json({ message: "Internal Server Error" });
     }
 };

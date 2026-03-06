@@ -1,23 +1,25 @@
 import express from 'express';
-import { getAllEvents, generateQR, markAttendance, getStudentStats } from '../controllers/eventController.js';
+import { getAllEvents, generateQR, markAttendance, getStudentStats, closeEvent, getEventAttendance } from '../controllers/eventController.js';
+import { verifyToken } from '../middleware/authMiddleware.js'; // 🔥 Import the Bouncer!
 
 const router = express.Router();
 
-// GET request to fetch all NGO activities
-// URL: http://localhost:5000/api/events
-router.get('/', getAllEvents);
+// Get all events for the dashboard
+router.get('/', verifyToken, getAllEvents);
 
-// POST request to turn on the QR code and set the GPS location
-// URL: http://localhost:5000/api/events/:id/generate-qr
-router.post('/:id/generate-qr', generateQR);
+// Get student statistics
+router.get('/student-stats/:studentId', verifyToken, getStudentStats);
 
-// POST request for a student to scan and check in
-// URL: http://localhost:5000/api/events/attend
-router.post('/attend', markAttendance);
+// Generate QR code for an event
+router.post('/:id/generate-qr', verifyToken, generateQR);
 
-// GET request to fetch a student's attendance percentage and history
-// URL: http://localhost:5000/api/events/student-stats/1
-router.get('/student-stats/:studentId', getStudentStats);
+// Mark attendance (Student scans QR)
+router.post('/attend', verifyToken, markAttendance);
 
+// Close event and auto-checkout
+router.post('/:id/close', verifyToken, closeEvent);
+
+//Fetch the attendance list for the Admin dashboard
+router.get('/:id/attendance', verifyToken, getEventAttendance);
 
 export default router;

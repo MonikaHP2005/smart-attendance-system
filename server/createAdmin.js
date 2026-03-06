@@ -1,56 +1,28 @@
-import bcrypt from 'bcrypt';
-import db from './config/db.js'; // Uses your existing database connection!
+import bcrypt from 'bcryptjs';
+import db from './config/db.js';
 
-const setupDatabase = async () => {
+const createAdmin = async () => {
     try {
-        console.log("Connecting to the database...");
+        const adminId = "ADMIN-001"; // Manual ID
+        const password = "admin123";
+        const email = "admin@fci.org";
+        const name = "FCI Administrator";
+        const batch = "STAFF"; // Added Batch
 
-        // 1. Create the Users table if it doesn't exist yet
-        await db.query(`
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL,
-                email VARCHAR(255) NOT NULL UNIQUE,
-                password VARCHAR(255) NOT NULL,
-                role ENUM('ADMIN', 'STUDENT') DEFAULT 'STUDENT',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            )
-        `);
-        console.log("✅ Users table is ready.");
-
-        // 2. Define your Admin credentials
-        const adminName = "Monika HP";
-        const adminEmail = "monikahp005@gmail.com";
-        const plainTextPassword = "Monika@123";
-
-        // 3. Check if this admin already exists to prevent duplicates
-        const [existing] = await db.query('SELECT * FROM users WHERE email = ?', [adminEmail]);
-        if (existing.length > 0) {
-            console.log("⚠️ Admin user already exists!");
-            process.exit(0);
-        }
-
-        // 4. Encrypt the password using bcrypt
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(plainTextPassword, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 5. Insert the encrypted Admin into the database
-        await db.execute(
-            'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-            [adminName, adminEmail, hashedPassword, 'ADMIN']
-        );
-
-        console.log(`✅ Success! Admin created.`);
-        console.log(`📧 Email: ${adminEmail}`);
-        console.log(`🔑 Password: ${plainTextPassword}`);
+        // Updated query to include 'id' and 'batch'
+        const query = 'INSERT INTO users (id, name, email, password, role, batch) VALUES (?, ?, ?, ?, ?, ?)';
         
-        // Close the connection
-        process.exit(0);
+        await db.execute(query, [adminId, name, email, hashedPassword, 'admin', batch]);
+
+        console.log("✅ Admin account created successfully!");
+        process.exit();
     } catch (error) {
-        console.error("❌ Error setting up database:", error);
+        console.error("❌ Error creating admin:", error);
         process.exit(1);
     }
 };
 
-setupDatabase();
+createAdmin();

@@ -1,99 +1,71 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
 
 const StudentLogin = () => {
-  const [email, setEmail] = useState('');
+  const [studentId, setStudentId] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
-
     try {
-      // Calls your Node.js backend authentication route
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('http://localhost:5000/api/auth/student-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ studentId, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
+        // 🔥 CRITICAL FIX: Specific Student Memory
+        localStorage.setItem('studentToken', data.token); 
+        localStorage.setItem('studentId', data.user?.id || studentId); 
+        localStorage.setItem('userRole', 'STUDENT');
         
-        // ========================================================
-        // We save the token, the role, AND the student's ID!
-        // ========================================================
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.user.role);
-        localStorage.setItem('userId', data.user.id); 
-        // ========================================================
-
-        // Redirect to the Student Dashboard
-        navigate('/student-dashboard'); 
+        toast.success(`Welcome back, ${data.user?.name || studentId}!`);
+        setTimeout(() => navigate('/student-dashboard'), 1000);
       } else {
-        setError(data.message || 'Invalid email or password');
+        toast.error(data.message || "Login failed");
       }
     } catch (err) {
-      setError('Cannot connect to the server. Is the backend running?');
+      toast.error("Cannot connect to the server.");
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-green-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg border border-gray-100">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-green-600">Student Login</h2>
-          <p className="mt-2 text-gray-500">Access your attendance dashboard</p>
+    <div className="bg-white p-10 rounded-[2rem] shadow-2xl w-full max-w-md border border-white/50 relative overflow-hidden animate-fade-in my-8">
+      <Toaster position="top-center" />
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-emerald-500 to-green-500"></div>
+
+      <div className="text-center mb-8 mt-2">
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Student Login</h2>
+        <p className="text-slate-500 font-medium mt-2 tracking-wide">Log in with your Roll Number</p>
+      </div>
+
+      <form className="space-y-6" onSubmit={handleLogin}>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Student ID</label>
+          <input type="text" required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold text-slate-900" value={studentId} onChange={(e) => setStudentId(e.target.value)} placeholder="e.g. FCI_001" />
         </div>
-
-        {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-100 rounded-md text-center">
-            {error}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Password</label>
+          <div className="relative">
+            <input type={showPassword ? "text" : "password"} required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-semibold text-slate-900" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-bold text-emerald-600 hover:text-emerald-800 transition-colors">
+              {showPassword ? "Hide" : "Show"}
+            </button>
           </div>
-        )}
-
-        <form className="space-y-4" onSubmit={handleLogin}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email Address</label>
-            <input
-              type="email"
-              required
-              className="w-full px-4 py-2 mt-1 border rounded-md focus:ring-green-500 focus:border-green-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="student@college.edu"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input
-              type="password"
-              required
-              className="w-full px-4 py-2 mt-1 border rounded-md focus:ring-green-500 focus:border-green-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full px-4 py-2 text-white bg-green-600 rounded-md hover:bg-green-700 transition font-semibold"
-          >
-            Log In
-          </button>
-        </form>
-
-        <p className="text-sm text-center text-gray-600 mt-4">
-          Don't have an account?{' '}
-          <Link to="/student-register" className="font-medium text-green-600 hover:underline">
-            Sign up here
-          </Link>
-        </p>
+        </div>
+        <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]">Log In</button>
+      </form>
+      <div className="mt-6 text-center">
+         <p className="text-slate-500 text-sm font-medium">Don't have an account? <Link to="/student-register" className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline transition-colors">Sign up here</Link></p>
+      </div>
+      <div className="mt-6 text-center pb-2">
+         <button onClick={() => navigate("/")} className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs px-5 py-2.5 rounded-full transition-all flex items-center justify-center gap-2 mx-auto hover:shadow-sm active:scale-95">Back to Main Portal</button>
       </div>
     </div>
   );

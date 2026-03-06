@@ -1,85 +1,68 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
 
 const AdminLogin = () => {
-  const [email, setEmail] = useState('');
+  const [adminId, setAdminId] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
-
     try {
-      // Calling your Node.js backend!
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch('http://localhost:5000/api/auth/admin-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ adminId, password }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Save the secure token to the browser
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('userRole', data.user.role);
+        // 🔥 CRITICAL FIX: Specific Admin Memory
+        localStorage.setItem('adminToken', data.token); 
+        localStorage.setItem('adminId', data.user?.id || adminId); 
+        localStorage.setItem('userRole', 'ADMIN');
         
-        // Redirect to the Admin Dashboard
-        window.location.href = '/admin-dashboard'; 
+        toast.success("Admin authorized.");
+        setTimeout(() => navigate('/admin-dashboard'), 1000);
       } else {
-        setError(data.message || 'Login failed');
+        toast.error(data.message || "Invalid Admin credentials");
       }
     } catch (err) {
-      setError('Cannot connect to the server. Is the backend running?');
+      toast.error("Connection error. Is the backend running?");
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-blue-50">
-      <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg border border-gray-100">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-blue-600">Admin Login</h2>
-          <p className="mt-2 text-gray-500">Secure Access for Faculty</p>
+    <div className="bg-white p-10 rounded-[2rem] shadow-2xl w-full max-w-md border border-white/50 relative overflow-hidden animate-fade-in my-8">
+      <Toaster position="top-center" />
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+
+      <div className="text-center mb-8 mt-2">
+        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Admin Login</h2>
+        <p className="text-slate-500 font-medium mt-2 tracking-wide">Secure Faculty Access</p>
+      </div>
+
+      <form className="space-y-6" onSubmit={handleLogin}>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Admin/Faculty ID</label>
+          <input type="text" required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-semibold text-slate-900" value={adminId} onChange={(e) => setAdminId(e.target.value)} placeholder="e.g. ADMIN-001" />
         </div>
-
-        {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-100 rounded-md text-center">
-            {error}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-widest">Password</label>
+          <div className="relative">
+            <input type={showPassword ? "text" : "password"} required className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-semibold text-slate-900" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="password" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors">
+              {showPassword ? "Hide" : "Show"}
+            </button>
           </div>
-        )}
-
-        <form className="space-y-4" onSubmit={handleLogin}>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email Address</label>
-            <input
-              type="email"
-              required
-              className="w-full px-4 py-2 mt-1 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="example@gmail.com"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Password</label>
-            <input
-              type="password"
-              required
-              className="w-full px-4 py-2 mt-1 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full px-4 py-2 text-white bg-blue-600 rounded-md hover:bg-blue-700 transition font-semibold"
-          >
-            Log In
-          </button>
-        </form>
+        </div>
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-blue-500/30 active:scale-[0.98]">Log In</button>
+      </form>
+      <div className="mt-8 text-center pb-2">
+         <button onClick={() => navigate("/")} className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs px-5 py-2.5 rounded-full transition-all flex items-center justify-center gap-2 mx-auto hover:shadow-sm active:scale-95">Back to Main Portal</button>
       </div>
     </div>
   );
