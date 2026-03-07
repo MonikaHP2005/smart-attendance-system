@@ -125,9 +125,15 @@ export const markAttendance = async (req, res) => {
             });
         }
 
-        // 📍 4. GPS GEOFENCE CHECK
-        // Check if the Admin saved their location when generating the QR code
-        if (event.latitude && event.longitude && studentLat && studentLon) {
+        // 📍 4. GPS GEOFENCE CHECK (Updated for Online Classes)
+        // Check if the Organiser saved their location (Physical Class)
+        if (event.latitude && event.longitude) {
+            
+            // If it's a physical class, we MUST have the student's GPS
+            if (!studentLat || !studentLon) {
+                 return res.status(400).json({ message: "GPS Location is required for physical classes. Please enable location services." });
+            }
+
             const distance = calculateDistance(
                 event.latitude, 
                 event.longitude, 
@@ -135,15 +141,15 @@ export const markAttendance = async (req, res) => {
                 studentLon
             );
 
-            // If the student is further than 50 meters away, reject them!
+            // If the student is further than 100 meters away, reject them!
             if (distance > 100) {
                 return res.status(403).json({ 
                     message: `Location Error: You are too far away. Get closer to the classroom. (Distance: ${Math.round(distance)}m)` 
                 });
             }
-        } else if (!studentLat || !studentLon) {
-             return res.status(400).json({ message: "GPS Location is required to mark attendance." });
         }
+        // 🔥 MAGIC FIX: If event.latitude is NULL (Online Class), it skips the entire block above!
+        // No distance calculation happens, and it proceeds directly to marking attendance.
 
         // 5. PROCESS ATTENDANCE (Check-in vs Check-out)
         const [existingRecord] = await db.query(

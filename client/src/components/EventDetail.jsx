@@ -14,7 +14,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   const [timeStatus, setTimeStatus] = useState('LOADING'); 
   const [timeMessage, setTimeMessage] = useState('');
   const [attendanceList, setAttendanceList] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(''); // Remembers what the Admin types
+  const [searchTerm, setSearchTerm] = useState(''); 
 
   const fetchAttendance = useCallback(async () => {
     if (!event) return;
@@ -26,11 +26,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
       
       if (response.ok) {
         const data = await response.json();
-        
-        // Sort the students alphabetically by their Name
         const sortedData = data.sort((a, b) => a.name.localeCompare(b.name));
-        
-        // Save the perfectly sorted list to memory
         setAttendanceList(sortedData);
       }
     } catch (error) {
@@ -79,45 +75,70 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event, isActive, fetchAttendance]); 
 
+  // 🔥 1. EXTRACTED API CALL
+  const sendGenerateRequest = async (latitude, longitude) => {
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`http://localhost:5000/api/events/${event.id}/generate-qr`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ latitude, longitude }),
+      });
+      const data = await response.json();
+      
+      if (response.ok) {
+        setQrToken(data.qrToken);
+        setIsActive(true);
+        if (onUpdate) onUpdate();
+        
+        // Custom success message based on class type
+        if (event.activity_type === 'ONLINE_CLASS') {
+          toast.success("Online Session Live! No GPS required.");
+        } else {
+          toast.success("QR Code Live! Geofence established.");
+        }
+      } else {
+        toast.error(data.message || "Failed to generate QR");
+      }
+    } catch (error) {
+      toast.error("Cannot connect to server.");
+    } finally {
+      setIsGenerating(false);
+      toast.dismiss('generating-toast');
+    }
+  };
+
+  // 🔥 2. UPDATED GENERATE LOGIC
   const handleGenerateQR = async () => {
     if (timeStatus !== 'READY') return;
     setIsGenerating(true);
 
+    // Bypass GPS completely for Online Classes
+    if (event.activity_type === 'ONLINE_CLASS') {
+      toast.loading("Starting Online Session...", { id: 'generating-toast' });
+      sendGenerateRequest(null, null);
+      return;
+    }
+
+    // Otherwise, physical class: request GPS
+    toast.loading("Acquiring GPS Lock...", { id: 'generating-toast' });
+    
     if (!navigator.geolocation) {
+      toast.dismiss('generating-toast');
       toast.error("Geolocation is not supported by your browser");
       setIsGenerating(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        try {
-          const token = localStorage.getItem('adminToken');
-          const response = await fetch(`http://localhost:5000/api/events/${event.id}/generate-qr`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ latitude, longitude }),
-          });
-          const data = await response.json();
-          if (response.ok) {
-            setQrToken(data.qrToken);
-            setIsActive(true);
-            if (onUpdate) onUpdate();
-            toast.success("QR Code Live! Geofence established.");
-          } else {
-            toast.error(data.message || "Failed to generate QR");
-          }
-        } catch (error) {
-          toast.error("Cannot connect to server.");
-        } finally {
-          setIsGenerating(false);
-        }
+      (position) => {
+        sendGenerateRequest(position.coords.latitude, position.coords.longitude);
       },
       (error) => {
+        toast.dismiss('generating-toast');
         toast.error("Please allow location access to set the geofence.");
         setIsGenerating(false);
       },
@@ -184,11 +205,11 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
       const doc = new jsPDF();
 
       doc.setFontSize(20);
-      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setTextColor(15, 23, 42); 
       doc.text("Attendance Report", 14, 22);
 
       doc.setFontSize(11);
-      doc.setTextColor(100, 116, 139); // slate-500
+      doc.setTextColor(100, 116, 139); 
       doc.text(`Subject: ${event.title}`, 14, 32);
       doc.text(`Batch: ${event.batch}`, 14, 38);
       doc.text(`Date: ${new Date(event.start_time).toLocaleDateString()}`, 14, 44);
@@ -226,7 +247,6 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   const qrDataString = JSON.stringify({ eventId: event.id, qrToken: qrToken });
   const isEventFinished = timeStatus === 'ENDED' || (!isActive && event.qr_token);
 
-  // Filter the list based on the search term (checks both Name and Roll No)
   const filteredAttendance = attendanceList.filter((student) => {
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -266,7 +286,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
                 <h2 className="text-2xl font-bold text-slate-800 mb-3">{timeStatus === 'TOO_EARLY' ? 'Not yet time' : 'Ready to start?'}</h2>
                 <p className="text-slate-500 mb-8 font-medium">{timeMessage}</p>
                 <button onClick={handleGenerateQR} disabled={isGenerating || timeStatus !== 'READY'} className={`w-full font-bold text-lg py-4 rounded-xl transition-all ${timeStatus === 'TOO_EARLY' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg'}`}>
-                  {isGenerating ? "Acquiring GPS Lock..." : timeStatus === 'TOO_EARLY' ? "Button Locked" : "Generate Live QR"}
+                  {isGenerating ? "Processing..." : timeStatus === 'TOO_EARLY' ? "Button Locked" : "Generate Live QR"}
                 </button>
               </div>
             ) : (
@@ -274,7 +294,9 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
                 <div className="bg-white p-4 rounded-3xl shadow-lg border-4 border-blue-50 mb-6">
                   <QRCodeSVG value={qrDataString} size={220} level="H" includeMargin={true} />
                 </div>
-                <p className="text-slate-500 mb-6 text-sm">Students must be within 50 meters.</p>
+                <p className="text-slate-500 mb-6 text-sm">
+                  {event.activity_type === 'ONLINE_CLASS' ? 'Scan to check in virtually.' : 'Students must be within 50 meters.'}
+                </p>
                 <button onClick={() => handleCloseEvent(false)} className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-bold py-3 rounded-xl transition-all">Close Event Early</button>
               </div>
             )}
@@ -303,7 +325,6 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
             </div>
           </div>
 
-          {/* THE SEARCH BAR */}
           {attendanceList.length > 0 && (
             <div className="mb-6">
               <div className="relative max-w-md">

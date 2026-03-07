@@ -22,7 +22,10 @@ function StudentDashboard() {
   useEffect(() => {
     sessionStorage.setItem('studentActiveTab', activeTab);
   }, [activeTab]);
+  
   const [popupData, setPopupData] = useState(null); 
+  // 🔥 ADDED STATE FOR LOGOUT MODAL
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   
   const [stats, setStats] = useState({ percentage: 0, attended: 0, total: 0 });
   const [history, setHistory] = useState([]);
@@ -40,7 +43,7 @@ function StudentDashboard() {
   const fetchStats = useCallback(async () => {
     if (!studentId || studentId === "Student") return; 
     try {
-      const token = localStorage.getItem('studentToken'); // 🔥 Use studentToken
+      const token = localStorage.getItem('studentToken'); 
       const response = await fetch(`http://localhost:5000/api/events/student-stats/${studentId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -57,7 +60,7 @@ function StudentDashboard() {
   const fetchProfile = useCallback(async () => {
     if (!studentId || studentId === "Student") return;
     try {
-      const token = localStorage.getItem('studentToken'); // 🔥 Use studentToken
+      const token = localStorage.getItem('studentToken'); 
       const response = await fetch(`http://localhost:5000/api/auth/profile/${studentId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -66,7 +69,7 @@ function StudentDashboard() {
         setProfileData({ 
           name: data.name || studentId, 
           email: data.email || '',
-          batch: data.batch || 'Unassigned' //it saves the batch!
+          batch: data.batch || 'Unassigned' 
         });
       }
     } catch (error) {
@@ -93,7 +96,7 @@ function StudentDashboard() {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           try {
-            const token = localStorage.getItem('studentToken'); // 🔥 Use studentToken
+            const token = localStorage.getItem('studentToken'); 
             const response = await fetch("http://localhost:5000/api/events/attend", {
               method: "POST",
               headers: { 
@@ -135,7 +138,7 @@ function StudentDashboard() {
 
   const handleSaveProfile = async () => {
     try {
-      const token = localStorage.getItem('studentToken'); // 🔥 Use studentToken
+      const token = localStorage.getItem('studentToken'); 
       const response = await fetch(`http://localhost:5000/api/auth/profile/${studentId}`, {
         method: 'PUT',
         headers: { 
@@ -161,7 +164,7 @@ function StudentDashboard() {
       return;
     }
     try {
-      const token = localStorage.getItem('studentToken'); // 🔥 Use studentToken
+      const token = localStorage.getItem('studentToken'); 
       const response = await fetch(`http://localhost:5000/api/auth/change-password/${studentId}`, {
         method: 'PUT',
         headers: { 
@@ -357,15 +360,14 @@ function StudentDashboard() {
         )}
       </div>
 
-      <button onClick={handleLogout} className="w-full bg-red-50 text-red-600 font-black tracking-wide py-4 rounded-2xl border border-red-100 hover:bg-red-100 transition-colors uppercase text-sm">
+      {/* 🔥 BUTTON TRIGGER UPDATED */}
+      <button onClick={() => setShowLogoutModal(true)} className="w-full bg-red-50 text-red-600 font-black tracking-wide py-4 rounded-2xl border border-red-100 hover:bg-red-100 transition-colors uppercase text-sm">
         Sign Out of Portal
       </button>
     </div>
   );
 
-  // 🔥 UI FIX: The wrapper uses `overflow-x-hidden` and `min-h-screen`
   return (
-    // 🔥 1. THE WRAPPER: Locked to exactly 'h-screen' and 'overflow-hidden' so the browser NEVER bounces
     <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
       <Toaster position="top-center" />
 
@@ -385,7 +387,7 @@ function StudentDashboard() {
         </div>
       )}
 
-      {/* 🔥 2. THE SIDEBAR: Set to exactly 'h-full' of the locked wrapper. (Removed sticky top-0) */}
+      {/* 🔥 THE SIDEBAR BUTTON UPDATED */}
       <aside className="hidden md:flex w-72 bg-green-900 text-green-50 border-r border-green-800 flex-col h-full shadow-2xl z-20">
         <div className="p-8 pb-10">
           <h1 className="text-3xl font-black text-white tracking-tight">FCI Portal</h1>
@@ -403,13 +405,13 @@ function StudentDashboard() {
           </button>
         </nav>
         <div className="p-4 border-t border-green-800/50">
-           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold text-red-300 hover:bg-red-900/30 transition-all">
+           <button onClick={() => setShowLogoutModal(true)} className="w-full flex items-center gap-3 px-6 py-4 rounded-2xl font-bold text-red-300 hover:bg-red-900/30 transition-all">
             <span className="text-xl">🚪</span> Sign Out
           </button>
         </div>
       </aside>
 
-      {/* 🔥 3. THE MAIN CONTENT: Added 'overflow-y-auto' so THIS is the only box that scrolls! */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 p-4 sm:p-8 md:p-12 bg-slate-50 h-full overflow-y-auto relative">
         <div className="max-w-4xl mx-auto w-full pb-20">
           {activeTab === 'home' && renderHome()}
@@ -432,6 +434,35 @@ function StudentDashboard() {
           <span className="text-[10px] font-black uppercase tracking-wider">Profile</span>
         </button>
       </nav>
+
+      {/* 🔥 ADDED: The Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-white p-8 rounded-[2rem] shadow-2xl max-w-sm w-full text-center">
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">⚠️</div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Sign Out?</h3>
+            <p className="text-slate-500 font-medium mb-8">Are you sure you want to securely log out?</p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setShowLogoutModal(false)} 
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  handleLogout();
+                }} 
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg hover:shadow-red-500/30 active:scale-95"
+              >
+                Yes, Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

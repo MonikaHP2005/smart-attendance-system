@@ -20,10 +20,19 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   ];
 
   const handleLogout = () => {
-    // Clear everything for a clean slate
+    // 🔥 1. Check the role BEFORE we clear the storage
+    const role = (localStorage.getItem('userRole') || 'admin').toLowerCase();
+
+    // 2. Clear everything for a clean slate
     localStorage.clear();
     sessionStorage.clear();
-    navigate('/admin-login');
+
+    // 🔥 3. Send them to the correct login page
+    if (role === 'organiser') {
+      navigate('/organiser-login'); // Adjust this string if your route name is different!
+    } else {
+      navigate('/admin-login');
+    }
   };
 
   return (
