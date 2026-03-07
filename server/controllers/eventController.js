@@ -199,27 +199,25 @@ export const getStudentStats = async (req, res) => {
         
         const studentBatch = users[0].batch;
 
-        // 🔥 2. COUNT TOTAL VALID CLASSES
-        // Rule 1: Must be for their batch.
-        // Rule 2: start_time <= NOW() means the class has already started or finished.
+        // 2. COUNT TOTAL VALID CLASSES
         const [totalResult] = await db.query(
             'SELECT COUNT(*) as total FROM events WHERE batch = ? AND start_time <= NOW()',
             [studentBatch]
         );
-        const totalClasses = totalResult[0].total || 0;
+        let totalClasses = totalResult[0].total || 0;
 
-        // 🔥 3. COUNT CLASSES ATTENDED BY STUDENT
-        // We JOIN the tables so we can check that the event belongs to their batch and is in the past
-        const [attendedResult] = await db.query(`
-            SELECT COUNT(DISTINCT a.event_id) as attended 
-            FROM attendance a 
-            JOIN events e ON a.event_id = e.id 
-            WHERE a.student_id = ? 
-              AND e.batch = ? 
-              AND e.start_time <= NOW()
-        `, [studentId, studentBatch]);
-        
+        // 🔥 FIX 1: Remove strict batch/time filters so it perfectly matches their History list
+        const [attendedResult] = await db.query(
+            'SELECT COUNT(DISTINCT event_id) as attended FROM attendance WHERE student_id = ?', 
+            [studentId]
+        );
         const attendedClasses = attendedResult[0].attended || 0;
+
+        // 🔥 FIX 2: Safety Check. If they attended an early or cross-batch class, 
+        // prevent the percentage from breaking 100% (e.g., 3/2 -> 150%)
+        if (totalClasses < attendedClasses) {
+            totalClasses = attendedClasses;
+        }
 
         // 4. CALCULATE THE TRUE PERCENTAGE
         let percentage = 0;
@@ -227,7 +225,7 @@ export const getStudentStats = async (req, res) => {
             percentage = Math.round((attendedClasses / totalClasses) * 100);
         }
 
-        // 5. FETCH RECENT HISTORY (For the bottom table on the dashboard)
+        // 5. FETCH RECENT HISTORY 
         const [history] = await db.query(`
             SELECT e.title, a.check_in_time, 
                    IF(a.check_out_time IS NOT NULL, 'PRESENT', 'IN SESSION') as status 
