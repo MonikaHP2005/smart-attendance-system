@@ -3,8 +3,11 @@ import React, { useState } from 'react';
 const EventList = ({ events, category, batch, onBack, onSelect }) => {
   // Add state to track sorting order ('desc' = newest first, 'asc' = oldest first)
   const [sortOrder, setSortOrder] = useState('desc');
+  
+  // 🔥 NEW: State to remember the search term
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // Create a sorted copy of the events array
+  // 1. Create a sorted copy of the events array
   const sortedEvents = [...events].sort((a, b) => {
     const timeA = new Date(a.start_time).getTime();
     const timeB = new Date(b.start_time).getTime();
@@ -12,11 +15,16 @@ const EventList = ({ events, category, batch, onBack, onSelect }) => {
     return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
+  // 🔥 2. NEW: Filter the sorted events by the search term
+  const filteredEvents = sortedEvents.filter((event) => {
+    return event.title.toLowerCase().includes(searchTerm.toLowerCase());
+  });
+
   return (
     <div className="animate-fade-in max-w-5xl mx-auto">
       
       {/* Header Section with Flexbox to align Title (Left) and Sort Dropdown (Right) */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>
           <button 
             onClick={onBack}
@@ -49,16 +57,40 @@ const EventList = ({ events, category, batch, onBack, onSelect }) => {
         )}
       </div>
 
+      {/* THE SEARCH BAR */}
+      {events.length > 0 && (
+        <div className="mb-8 max-w-md">
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+            <input 
+              type="text" 
+              placeholder="Search sessions by name..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border border-slate-200 text-slate-800 text-sm rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block pl-12 p-3.5 font-medium transition-all"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Empty State or Event List */}
-      {sortedEvents.length === 0 ? (
+      {events.length === 0 ? (
         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
           <div className="text-5xl mb-4">📭</div>
           <h3 className="text-xl font-bold text-slate-700">No events scheduled</h3>
           <p className="text-slate-500 mt-2">There are no {category?.label?.toLowerCase()} planned for Batch {batch} yet.</p>
         </div>
+      ) : filteredEvents.length === 0 ? (
+        // 🔥 NEW: Empty state for when the search finds nothing
+        <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
+          <div className="text-5xl mb-4">🕵️‍♂️</div>
+          <h3 className="text-xl font-bold text-slate-700">No sessions found</h3>
+          <p className="text-slate-500 mt-2">No sessions match the search "{searchTerm}".</p>
+        </div>
       ) : (
         <div className="flex flex-col gap-4">
-          {sortedEvents.map((event) => (
+          {/* 🔥 MAP OVER THE FILTERED EVENTS INSTEAD OF SORTED EVENTS */}
+          {filteredEvents.map((event) => (
             <div 
               key={event.id}
               onClick={() => onSelect(event)}

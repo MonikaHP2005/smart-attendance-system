@@ -2,16 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 
 const AdminProfile = () => {
-  // 🔥 Read the specific adminId
-  const adminId = localStorage.getItem('adminId') || 'ADMIN-001';
-  const role = localStorage.getItem('userRole') || 'ADMIN';
-
+  const adminId = sessionStorage.getItem('adminId') || 'ADMIN-001';
+  
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({ name: adminId, email: '' });
 
   const fetchProfile = useCallback(async () => {
     try {
-      const token = localStorage.getItem('adminToken'); // 🔥 Use adminToken
+      const token = sessionStorage.getItem('adminToken');
       const response = await fetch(`http://localhost:5000/api/auth/profile/${adminId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -20,7 +18,7 @@ const AdminProfile = () => {
         setFormData({ name: data.name || adminId, email: data.email || '' });
       }
     } catch (error) {
-      console.error("Failed to fetch profile");
+      console.error("Failed to fetch admin profile");
     }
   }, [adminId]);
 
@@ -30,7 +28,7 @@ const AdminProfile = () => {
 
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem('adminToken'); // 🔥 Use adminToken
+      const token = sessionStorage.getItem('adminToken');
       const response = await fetch(`http://localhost:5000/api/auth/profile/${adminId}`, {
         method: 'PUT',
         headers: { 
@@ -41,13 +39,13 @@ const AdminProfile = () => {
       });
 
       if (response.ok) {
-        toast.success("Profile updated successfully!");
+        toast.success("Admin Profile updated successfully!");
         setIsEditing(false);
       } else {
         toast.error("Failed to update profile.");
       }
     } catch (error) {
-      toast.error("Failed to update profile.");
+      toast.error("Connection error.");
     }
   };
 
@@ -56,12 +54,14 @@ const AdminProfile = () => {
       <Toaster position="top-center" />
       <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-8">Admin Profile</h1>
       
-      <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col items-center text-center">
+      <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        {/* Avatar locked to Blue Theme */}
         <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white text-5xl font-bold shadow-xl mb-6 border-4 border-white outline outline-4 outline-blue-50">
           {formData.name.charAt(0).toUpperCase()}
         </div>
+        
         <h2 className="text-3xl font-black text-slate-800 mb-2">{formData.name}</h2>
-        <span className="bg-blue-50 text-blue-600 font-bold px-4 py-1.5 rounded-full text-sm uppercase tracking-widest mb-8">{role}</span>
+        <span className="bg-blue-50 text-blue-600 font-bold px-4 py-1.5 rounded-full text-sm uppercase tracking-widest mb-8">Super Admin</span>
 
         <div className="w-full max-w-md bg-slate-50 rounded-2xl p-6 text-left border border-slate-100 relative">
           {!isEditing && (
@@ -71,17 +71,17 @@ const AdminProfile = () => {
           )}
 
           <div className="mb-6">
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Account ID / Name</label>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Admin ID</label>
             {isEditing ? (
-              <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full mt-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-all" />
+              <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full mt-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none" />
             ) : <p className="text-lg font-semibold text-slate-800">{formData.name}</p>}
           </div>
 
           <div className="mb-6">
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Email Address</label>
             {isEditing ? (
-              <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full mt-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-all" />
-            ) : <p className="text-lg font-semibold text-slate-800">{formData.email || 'Not provided'}</p>}
+              <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full mt-1 bg-white border border-slate-300 rounded-lg px-3 py-2 text-slate-800 font-semibold focus:ring-2 focus:ring-blue-500 outline-none" />
+            ) : <p className="text-lg font-semibold text-slate-800">{formData.email || 'admin@fci-india.org'}</p>}
           </div>
 
           <div className="mb-6">
@@ -101,7 +101,7 @@ const AdminProfile = () => {
         {isEditing && (
           <div className="flex gap-4 w-full max-w-md mt-6 animate-fade-in">
             <button onClick={() => setIsEditing(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 rounded-xl transition-all">Cancel</button>
-            <button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg">Save Details</button>
+            <button onClick={handleSave} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/30">Save Details</button>
           </div>
         )}
       </div>

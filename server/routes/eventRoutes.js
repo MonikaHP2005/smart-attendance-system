@@ -1,25 +1,35 @@
 import express from 'express';
 import { getAllEvents, generateQR, markAttendance, getStudentStats, closeEvent, getEventAttendance } from '../controllers/eventController.js';
-import { verifyToken } from '../middleware/authMiddleware.js'; // 🔥 Import the Bouncer!
+// 🔥 IMPORT BOTH BOUNCERS: verifyToken (for everyone) and verifyStaff (for Admin/Organiser only)
+import { verifyToken, verifyStaff } from '../middleware/authMiddleware.js'; 
 
 const router = express.Router();
 
-// Get all events for the dashboard
-router.get('/', verifyToken, getAllEvents);
+// ==========================================
+// 👔 STAFF ONLY ROUTES (Admin & Organiser)
+// ==========================================
 
-// Get student statistics
-router.get('/student-stats/:studentId', verifyToken, getStudentStats);
+// Get all events for the dashboard 
+router.get('/', verifyToken, verifyStaff, getAllEvents);
 
 // Generate QR code for an event
-router.post('/:id/generate-qr', verifyToken, generateQR);
-
-// Mark attendance (Student scans QR)
-router.post('/attend', verifyToken, markAttendance);
+router.post('/:id/generate-qr', verifyToken, verifyStaff, generateQR);
 
 // Close event and auto-checkout
-router.post('/:id/close', verifyToken, closeEvent);
+router.post('/:id/close', verifyToken, verifyStaff, closeEvent);
 
-//Fetch the attendance list for the Admin dashboard
-router.get('/:id/attendance', verifyToken, getEventAttendance);
+// Fetch the attendance list for the Admin dashboard
+router.get('/:id/attendance', verifyToken, verifyStaff, getEventAttendance);
+
+
+// ==========================================
+// 🎓 STUDENT / SHARED ROUTES
+// ==========================================
+
+// Mark attendance (Student scans QR) - NO verifyStaff here, or students get blocked!
+router.post('/attend', verifyToken, markAttendance);
+
+// Get student statistics - Kept open so students can view their own stats
+router.get('/student-stats/:studentId', verifyToken, getStudentStats);
 
 export default router;

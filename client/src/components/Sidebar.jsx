@@ -4,26 +4,35 @@ import { useNavigate } from 'react-router-dom';
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const adminId = localStorage.getItem('userId') || 'Admin';
+  
+  // 🔥 Switched from sessionStorage to localStorage
+  const adminId = localStorage.getItem('adminId') || 'User';
+  const userRole = (localStorage.getItem('userRole') || 'admin').toLowerCase();
 
+  // Dynamic colors based on role
+  const activeBgColor = userRole === 'admin' ? 'bg-blue-600' : 'bg-purple-600';
+  const activeShadowColor = userRole === 'admin' ? 'shadow-blue-500/30' : 'shadow-purple-500/30';
+  const profileGradient = userRole === 'admin' ? 'from-blue-500 to-indigo-500' : 'from-purple-500 to-fuchsia-500';
+
+  // 🔥 UPDATED: Removed 'categories' item since they are on the Home screen
   const menuItems = [
     { id: 'dashboard', label: 'Home', icon: '🏠' },
-    { id: 'categories', label: 'Categories', icon: '📂' },
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userId');
+    // Clear everything for a clean slate
+    localStorage.clear();
+    sessionStorage.clear();
     navigate('/admin-login');
   };
 
   return (
     <>
       <aside className="w-72 bg-[#0B1120] text-slate-300 min-h-screen fixed left-0 top-0 flex flex-col shadow-2xl z-40">
-        
         <div className="p-8 pb-10">
-          <h1 className="text-2xl font-black text-white tracking-tight">FCI ADMIN</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">
+            {userRole === 'admin' ? 'FCI ADMIN' : 'FCI ORGANISER'}
+          </h1>
           <p className="text-xs font-bold text-slate-500 tracking-widest uppercase mt-1">Smart Attendance</p>
         </div>
 
@@ -34,7 +43,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl font-bold transition-all ${
                 activeTab === item.id 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                  ? `${activeBgColor} text-white shadow-lg ${activeShadowColor}` 
                   : 'hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -42,19 +51,31 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
               {item.label}
             </button>
           ))}
+
+          {/* Add Organiser Button (Only visible to Super Admin) */}
+          {userRole === 'admin' && (
+            <button
+              onClick={() => setActiveTab('add-organiser')}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl font-bold transition-all ${
+                activeTab === 'add-organiser' 
+                  ? `${activeBgColor} text-white shadow-lg ${activeShadowColor}` 
+                  : 'hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <span className="text-xl">👥</span>
+              Add Organiser
+            </button>
+          )}
         </nav>
 
-        {/* BOTTOM SECTION: Profile & Logout */}
         <div className="mt-auto p-4 border-t border-slate-800/50 space-y-2">
-          
-          {/* New Profile Button */}
           <button 
             onClick={() => setActiveTab('profile')}
             className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
               activeTab === 'profile' ? 'bg-slate-800 text-white' : 'hover:bg-slate-800/50'
             }`}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
+            <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${profileGradient} flex items-center justify-center text-white font-bold text-lg shadow-md`}>
               {adminId.charAt(0).toUpperCase()}
             </div>
             <div className="text-left flex-1 overflow-hidden">
@@ -63,7 +84,6 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
             </div>
           </button>
 
-          {/* Sign Out Button */}
           <button 
             onClick={() => setShowLogoutModal(true)}
             className="w-full flex items-center gap-4 px-6 py-3.5 rounded-xl font-bold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"

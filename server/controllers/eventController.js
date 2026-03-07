@@ -57,137 +57,198 @@ export const generateQR = async (req, res) => {
     }
 };
 
+
 // ==========================================
-// HELPER FUNCTION: CALCULATE GPS DISTANCE
+// HELPER: Calculate GPS Distance (Haversine Formula)
 // ==========================================
-// This calculates the distance in meters between two coordinates
+// This calculates the distance in meters between the Admin and the Student
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // Earth's radius in meters
-    const rad = Math.PI / 180;
-    const dLat = (lat2 - lat1) * rad;
-    const dLon = (lon2 - lon1) * rad;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * rad) * Math.cos(lat2 * rad) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const toRadians = (degree) => degree * (Math.PI / 180);
+    
+    const phi1 = toRadians(lat1);
+    const phi2 = toRadians(lat2);
+    const deltaPhi = toRadians(lat2 - lat1);
+    const deltaLambda = toRadians(lon2 - lon1);
+
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance in meters
+    return R * c; // Returns distance in meters
 };
 
 // ==========================================
-// 3. STUDENT SCAN (CHECK-IN & CHECK-OUT LOGIC)
+// MAIN: Process QR Scan Attendance
 // ==========================================
 export const markAttendance = async (req, res) => {
     try {
-        console.log("\n==============================");
-        console.log("📸 NEW QR SCAN DETECTED!");
-        console.log("Data received from phone:", req.body);
-
         const { eventId, qrToken, studentLat, studentLon, studentId } = req.body;
 
-        if (!studentId) {
-            console.log("❌ ERROR: studentId is missing!");
-            return res.status(400).json({ message: "Student ID missing. Please log out and log back in." });
+        // 1. VERIFY EVENT, GET BATCH & ADMIN LOCATION
+        const [events] = await db.query(
+            'SELECT batch, qr_token, is_active, latitude, longitude FROM events WHERE id = ?', 
+            [eventId]
+        );
+        
+        if (events.length === 0) {
+            return res.status(404).json({ message: "Event not found." });
         }
-
-        // 1. Validate Event
-        const [events] = await db.query('SELECT * FROM events WHERE id = ? AND is_active = TRUE', [eventId]);
-        if (events.length === 0) return res.status(400).json({ message: "This QR code is no longer active." });
         
         const event = events[0];
-        if (event.qr_token !== qrToken) return res.status(403).json({ message: "Invalid or expired QR Token!" });
 
-        // 2. Check-In vs Check-Out Logic
-        const [existing] = await db.query(
-            'SELECT * FROM attendance WHERE student_id = ? AND event_id = ?',
-            [studentId, eventId]
+        // Basic Security Checks
+        if (!event.is_active) {
+            return res.status(400).json({ message: "This session is currently closed." });
+        }
+        if (event.qr_token !== qrToken) {
+            return res.status(400).json({ message: "Invalid or expired QR Code." });
+        }
+
+        // 2. GET STUDENT'S BATCH
+        const [students] = await db.query(
+            'SELECT batch FROM users WHERE id = ?', 
+            [studentId]
+        );
+        
+        if (students.length === 0) {
+            return res.status(404).json({ message: "Student not found in database." });
+        }
+        
+        const student = students[0];
+
+        // 🔥 3. THE BOUNCER: COMPARE BATCHES
+        if (event.batch !== student.batch) {
+            return res.status(403).json({ 
+                message: `Access Denied: This session is for ${event.batch}. You belong to ${student.batch}.` 
+            });
+        }
+
+        // 📍 4. GPS GEOFENCE CHECK
+        // Check if the Admin saved their location when generating the QR code
+        if (event.latitude && event.longitude && studentLat && studentLon) {
+            const distance = calculateDistance(
+                event.latitude, 
+                event.longitude, 
+                studentLat, 
+                studentLon
+            );
+
+            // If the student is further than 50 meters away, reject them!
+            if (distance > 100) {
+                return res.status(403).json({ 
+                    message: `Location Error: You are too far away. Get closer to the classroom. (Distance: ${Math.round(distance)}m)` 
+                });
+            }
+        } else if (!studentLat || !studentLon) {
+             return res.status(400).json({ message: "GPS Location is required to mark attendance." });
+        }
+
+        // 5. PROCESS ATTENDANCE (Check-in vs Check-out)
+        const [existingRecord] = await db.query(
+            'SELECT id, check_out_time FROM attendance WHERE event_id = ? AND student_id = ?',
+            [eventId, studentId]
         );
 
-        console.log("🔍 Did we find them in the database?", existing.length > 0 ? "YES" : "NO");
-
-        if (existing.length === 0) {
-            console.log("➡️ SCENARIO A: Database is empty for this student. Checking them IN.");
-            await db.execute(
-                `INSERT INTO attendance (student_id, event_id, check_in_time, status) 
-                 VALUES (?, ?, NOW(), 'PRESENT')`,
-                [studentId, eventId]
-            );
-            return res.status(200).json({ action: "CHECK_IN", message: "Checked In Successfully!" });
+        if (existingRecord.length > 0) {
+            const record = existingRecord[0];
             
-        } else {
-            const record = existing[0];
-            console.log("📊 Existing Record Details:", record);
-            
-            if (record.check_out_time === null) {
-                // Time-lock check
-                const [timeCheck] = await db.query(
-                    `SELECT TIMESTAMPDIFF(SECOND, check_in_time, NOW()) as seconds_passed FROM attendance WHERE id = ?`,
+            // If they have a record but haven't checked out yet -> Check Out
+            if (!record.check_out_time) {
+                await db.query(
+                    'UPDATE attendance SET check_out_time = NOW() WHERE id = ?', 
                     [record.id]
                 );
-                
-                const secondsPassed = timeCheck[0].seconds_passed;
-                console.log(`⏱️ Seconds since check-in: ${secondsPassed}`);
-
-                if (secondsPassed < 60) {
-                    console.log("⚠️ Camera double-fired within 60s. Ignoring safely.");
-                    return res.status(200).json({ action: "CHECK_IN", message: "Checked In Successfully!" });
-                }
-
-                console.log("⬅️ SCENARIO B: Time passed. Checking them OUT.");
-                await db.execute(
-                    `UPDATE attendance 
-                     SET check_out_time = NOW(), duration_minutes = TIMESTAMPDIFF(MINUTE, check_in_time, NOW())
-                     WHERE id = ?`,
-                    [record.id]
-                );
-                return res.status(200).json({ action: "CHECK_OUT", message: "Checked Out Successfully!" });
-                
+                return res.status(200).json({ action: "CHECK_OUT", message: "Checked out successfully!" });
             } else {
-                console.log("🛑 SCENARIO C: They already have a checkout time!");
-                return res.status(400).json({ message: "You have already checked out of this event." });
+                return res.status(400).json({ message: "You have already completed attendance for this session." });
             }
         }
 
+        // No existing record -> Check In
+        await db.query(
+            'INSERT INTO attendance (event_id, student_id, check_in_time) VALUES (?, ?, NOW())',
+            [eventId, studentId]
+        );
+
+        res.status(200).json({ action: "CHECK_IN", message: "Checked in successfully!" });
+
     } catch (error) {
-        console.error("🔥 CRITICAL BACKEND ERROR:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        console.error("Attendance Error:", error);
+        res.status(500).json({ message: "Server error processing attendance." });
     }
 };
 
 // ==========================================
 // 4. GET STUDENT ATTENDANCE STATS
 // ==========================================
+// ==========================================
+// FETCH STUDENT DASHBOARD STATS
+// ==========================================
 export const getStudentStats = async (req, res) => {
     try {
         const { studentId } = req.params;
 
-        // 1. Get total events the NGO has ever held
-        const [totalEvents] = await db.query('SELECT COUNT(*) as count FROM events');
-        const total = totalEvents[0].count;
+        // 1. Get the student's assigned batch first
+        const [users] = await db.query('SELECT batch FROM users WHERE id = ?', [studentId]);
+        
+        if (users.length === 0) {
+            return res.status(404).json({ message: "Student not found" });
+        }
+        
+        const studentBatch = users[0].batch;
 
-        // 2. Get total events this specific student attended
-        const [attendedEvents] = await db.query(
-            'SELECT COUNT(*) as count FROM attendance WHERE student_id = ? AND status = "PRESENT"', 
-            [studentId]
+        // 🔥 2. COUNT TOTAL VALID CLASSES
+        // Rule 1: Must be for their batch.
+        // Rule 2: start_time <= NOW() means the class has already started or finished.
+        const [totalResult] = await db.query(
+            'SELECT COUNT(*) as total FROM events WHERE batch = ? AND start_time <= NOW()',
+            [studentBatch]
         );
-        const attended = attendedEvents[0].count;
+        const totalClasses = totalResult[0].total || 0;
 
-        // 3. Calculate Percentage
-        const percentage = total === 0 ? 0 : Math.round((attended / total) * 100);
+        // 🔥 3. COUNT CLASSES ATTENDED BY STUDENT
+        // We JOIN the tables so we can check that the event belongs to their batch and is in the past
+        const [attendedResult] = await db.query(`
+            SELECT COUNT(DISTINCT a.event_id) as attended 
+            FROM attendance a 
+            JOIN events e ON a.event_id = e.id 
+            WHERE a.student_id = ? 
+              AND e.batch = ? 
+              AND e.start_time <= NOW()
+        `, [studentId, studentBatch]);
+        
+        const attendedClasses = attendedResult[0].attended || 0;
 
-        // 4. Get their specific attendance history details
+        // 4. CALCULATE THE TRUE PERCENTAGE
+        let percentage = 0;
+        if (totalClasses > 0) {
+            percentage = Math.round((attendedClasses / totalClasses) * 100);
+        }
+
+        // 5. FETCH RECENT HISTORY (For the bottom table on the dashboard)
         const [history] = await db.query(`
-            SELECT e.title, e.activity_type, a.check_in_time, a.status 
-            FROM attendance a
-            JOIN events e ON a.event_id = e.id
-            WHERE a.student_id = ?
-            ORDER BY a.check_in_time DESC
+            SELECT e.title, a.check_in_time, 
+                   IF(a.check_out_time IS NOT NULL, 'PRESENT', 'IN SESSION') as status 
+            FROM attendance a 
+            JOIN events e ON a.event_id = e.id 
+            WHERE a.student_id = ? 
+            ORDER BY a.check_in_time DESC 
+            LIMIT 5
         `, [studentId]);
 
-        res.status(200).json({ total, attended, percentage, history });
+        // 6. SEND IT ALL TO THE FRONTEND
+        res.status(200).json({
+            percentage: percentage,
+            attended: attendedClasses,
+            total: totalClasses,
+            history: history
+        });
 
     } catch (error) {
-        console.error("Error fetching student stats:", error);
-        res.status(500).json({ message: "Internal Server Error" });
+        console.error("Stats Error:", error);
+        res.status(500).json({ message: "Server error calculating stats." });
     }
 };
 

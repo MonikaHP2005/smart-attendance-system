@@ -3,40 +3,38 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    /* Pure white background for the whole browser window */
-    @apply bg-white font-sans antialiased text-slate-900 m-0 p-0;
+  html, body {
+    background-color: #f8fafc; 
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden; 
+    overscroll-behavior: none; /* 🔥 THIS COMPLETELY KILLS THE WHITE BOUNCE */
+    @apply font-sans antialiased text-slate-900;
   }
+
+  /* ... rest of your code ... */
+
+
+/* For the Student Side Sidebar */
+.student-theme-bg {
+  background-color: #064e3b; /* Deep Forest Green */
 }
 
-/* Force the React root to take up 100% of the screen width with no limits */
-#root {
-  width: 100vw;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-  max-width: none; /* This kills the hidden Vite limit! */
-}
-
+/* Professional Page Transitions */
 .animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
+  animation: fadeIn 0.4s ease-out forwards;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* This targets the actual browser background */
-html, body {
-  background-color: #f8fafc; /* This is Tailwind's slate-50 */
-  margin: 0;
-  padding: 0;
-  /* Optional: Prevents the "rubber band" bounce effect on mobile */
-  overscroll-behavior-y: none; 
+/* Hide scrollbars for a cleaner look on dashboard cards if needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
-
-/* For the Student Side (Dark Green Sidebar area) */
-.student-theme-bg {
-  background-color: #064e3b; /* This is green-900 */
-}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}}

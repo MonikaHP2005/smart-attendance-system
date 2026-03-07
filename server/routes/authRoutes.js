@@ -1,78 +1,52 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { register, studentLogin, adminLogin } from '../controllers/authController.js';
-import { verifyToken } from '../middleware/authMiddleware.js'; // 🔥 Import the Bouncer!
-import db from '../config/db.js'; // 🔥 Make sure DB is imported for your inline queries!
+// 🔥 Import all cleaned controller functions
+import { 
+    register, 
+    studentLogin, 
+    adminLogin, 
+    organiserLogin, 
+    registerOrganiser,
+    getProfile,
+    updateProfile 
+} from '../controllers/authController.js';
+import { verifyToken } from '../middleware/authMiddleware.js'; 
+import db from '../config/db.js'; 
 
 const router = express.Router();
 
 // ==========================================
-// 🔓 PUBLIC ROUTES (Anyone can access these)
+// 🔓 PUBLIC ROUTES (Anyone can access)
 // ==========================================
 router.post('/register', register);
 router.post('/student-login', studentLogin);
 router.post('/admin-login', adminLogin);
-
+router.post('/organiser-login', organiserLogin);
 
 // ==========================================
-// 🔒 PROTECTED ROUTES (Must have a valid token)
+// 🔒 PROTECTED ROUTES (Requires Token)
 // ==========================================
 
-// Fetch user profile details (Real name and email)
-router.get('/profile/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // Fetch the user's real name and email from the DB
-        const [users] = await db.query('SELECT name, email FROM users WHERE id = ?', [id]);
-        
-        if (users.length === 0) {
-            return res.status(404).json({ message: "User not found" });
-        }
+// 🔥 CLEANED: Uses the function from authController
+router.get('/profile/:id', verifyToken, getProfile);
 
-        res.status(200).json(users[0]);
-    } catch (error) {
-        console.error("Error fetching profile:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
+// 🔥 CLEANED: Uses the function from authController
+router.put('/profile/:id', verifyToken, updateProfile);
 
-// Update Profile
-router.put('/profile/:id', verifyToken, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { name, email } = req.body; 
-
-        // Update the user in the database
-        await db.query(
-            'UPDATE users SET name = ?, email = ? WHERE id = ?',
-            [name, email, id]
-        );
-
-        res.status(200).json({ message: "Profile updated successfully!" });
-    } catch (error) {
-        console.error("Error updating profile:", error);
-        res.status(500).json({ message: "Failed to update profile" });
-    }
-});
-
-// Change Password
+// Change Password (Keeping this here as it's a specific utility)
 router.put('/change-password/:id', verifyToken, async (req, res) => {
     try {
         const { id } = req.params;
         const { currentPassword, newPassword } = req.body;
 
-        // 1. Fetch the user's current password from the database
         const [users] = await db.query('SELECT password FROM users WHERE id = ?', [id]);
         if (users.length === 0) return res.status(404).json({ message: "User not found" });
 
         const user = users[0];
 
-        // 2. Verify the current password
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) return res.status(400).json({ message: "Incorrect current password" });
 
-        // 3. Hash the new password and update the database
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
@@ -84,5 +58,8 @@ router.put('/change-password/:id', verifyToken, async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 });
+
+// Admin only route
+router.post('/register-organiser', verifyToken, registerOrganiser);
 
 export default router;

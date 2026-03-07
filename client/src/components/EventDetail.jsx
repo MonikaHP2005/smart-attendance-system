@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import toast, { Toaster } from 'react-hot-toast';
 
+// Import the PDF libraries
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 const EventDetail = ({ event, onBack, onUpdate }) => {
   const [qrToken, setQrToken] = useState(event?.qr_token || null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -10,17 +14,24 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   const [timeStatus, setTimeStatus] = useState('LOADING'); 
   const [timeMessage, setTimeMessage] = useState('');
   const [attendanceList, setAttendanceList] = useState([]);
+  const [searchTerm, setSearchTerm] = useState(''); // Remembers what the Admin types
 
   const fetchAttendance = useCallback(async () => {
     if (!event) return;
     try {
-      const token = localStorage.getItem('adminToken'); // 🔥 Use adminToken
+      const token = localStorage.getItem('adminToken');
       const response = await fetch(`http://localhost:5000/api/events/${event.id}/attendance`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
       if (response.ok) {
         const data = await response.json();
-        setAttendanceList(data);
+        
+        // Sort the students alphabetically by their Name
+        const sortedData = data.sort((a, b) => a.name.localeCompare(b.name));
+        
+        // Save the perfectly sorted list to memory
+        setAttendanceList(sortedData);
       }
     } catch (error) {
       console.error("Failed to fetch attendance.");
@@ -82,7 +93,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
       async (position) => {
         const { latitude, longitude } = position.coords;
         try {
-          const token = localStorage.getItem('adminToken'); // 🔥 Use adminToken
+          const token = localStorage.getItem('adminToken');
           const response = await fetch(`http://localhost:5000/api/events/${event.id}/generate-qr`, {
             method: 'POST',
             headers: { 
@@ -116,7 +127,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
 
   const handleCloseEvent = async (isAutoClose = false) => {
     try {
-      const token = localStorage.getItem('adminToken'); // 🔥 Use adminToken
+      const token = localStorage.getItem('adminToken');
       const response = await fetch(`http://localhost:5000/api/events/${event.id}/close`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
@@ -134,10 +145,95 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
     }
   };
 
+  // --- EXCEL/CSV EXPORT ---
+  const handleDownloadCSV = () => {
+    if (attendanceList.length === 0) {
+      toast.error("No attendance data to download yet.");
+      return;
+    }
+
+    const headers = ["Student Name", "Roll No", "Check-In Time", "Check-Out Time"];
+    const csvRows = attendanceList.map(record => {
+      const checkIn = new Date(record.check_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const checkOut = record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'In Session';
+      return [`"${record.name}"`, record.student_id, checkIn, checkOut].join(",");
+    });
+
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    
+    const cleanFileName = `${event.title.replace(/\s+/g, '_')}_${event.batch}_Attendance.csv`;
+    link.setAttribute("download", cleanFileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Excel report downloaded!");
+  };
+
+  // --- PDF EXPORT ---
+  const handleDownloadPDF = () => {
+    if (attendanceList.length === 0) {
+      toast.error("No attendance data to download yet.");
+      return;
+    }
+
+    try {
+      const doc = new jsPDF();
+
+      doc.setFontSize(20);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("Attendance Report", 14, 22);
+
+      doc.setFontSize(11);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text(`Subject: ${event.title}`, 14, 32);
+      doc.text(`Batch: ${event.batch}`, 14, 38);
+      doc.text(`Date: ${new Date(event.start_time).toLocaleDateString()}`, 14, 44);
+      doc.text(`Total Present: ${attendanceList.length}`, 14, 50);
+
+      const tableColumn = ["Student Name", "Roll No", "Check-In", "Check-Out"];
+      const tableRows = [];
+
+      attendanceList.forEach(record => {
+        const checkIn = new Date(record.check_in_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const checkOut = record.check_out_time ? new Date(record.check_out_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'In Session';
+        tableRows.push([record.name, record.student_id, checkIn, checkOut]);
+      });
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 56, 
+        theme: 'grid',
+        headStyles: { fillColor: [37, 99, 235] }, 
+      });
+
+      const cleanFileName = `${event.title.replace(/\s+/g, '_')}_${event.batch}_Attendance.pdf`;
+      doc.save(cleanFileName);
+      toast.success("PDF report downloaded!");
+      
+    } catch (error) {
+      console.error("PDF Generation Error:", error);
+      toast.error("Failed to generate PDF. Check console.");
+    }
+  };
+
   if (!event) return null;
 
   const qrDataString = JSON.stringify({ eventId: event.id, qrToken: qrToken });
   const isEventFinished = timeStatus === 'ENDED' || (!isActive && event.qr_token);
+
+  // Filter the list based on the search term (checks both Name and Roll No)
+  const filteredAttendance = attendanceList.filter((student) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      student.name.toLowerCase().includes(searchLower) ||
+      student.student_id.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto">
@@ -146,7 +242,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
       <div className="flex items-center justify-between mb-8">
         <div>
           <button onClick={onBack} className="bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-700 px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-2 mb-4 shadow-sm active:scale-95 w-fit border border-slate-200">
-            <span className="text-base leading-none">←</span> Back
+           Back
           </button>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">{event.title}</h1>
           <p className="text-slate-500 font-medium mt-1 tracking-wide">Batch: {event.batch} | Instructor: {event.instructor_name || 'N/A'}</p>
@@ -185,20 +281,58 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
           </div>
         )}
 
-        <div className={`bg-white p-8 rounded-[2.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 ${!isEventFinished && qrToken ? 'lg:col-span-8' : 'w-full'}`}>
-          <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+        <div className={`bg-white p-8 rounded-[2.5rem] shadow-[0_4px_20px_rgba(0,0,0,0.03)] border border-slate-100 flex flex-col ${!isEventFinished && qrToken ? 'lg:col-span-8' : 'w-full'}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-6">
             <h3 className="text-2xl font-bold text-slate-800 tracking-tight">Attendance Roster</h3>
-            <span className="bg-blue-50 text-blue-600 font-bold px-4 py-1.5 rounded-full text-sm">Total Present: {attendanceList.length}</span>
+            
+            <div className="flex items-center gap-3">
+              <span className="bg-blue-50 text-blue-600 font-bold px-4 py-2 rounded-xl text-sm border border-blue-100 hidden sm:block">
+                Total Present: {attendanceList.length}
+              </span>
+              
+              {attendanceList.length > 0 && (
+                <>
+                  <button onClick={handleDownloadCSV} className="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-md active:scale-95 flex items-center gap-2">
+                    <span className="text-lg leading-none">📊</span> Excel
+                  </button>
+                  <button onClick={handleDownloadPDF} className="bg-red-600 hover:bg-red-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition-all shadow-md active:scale-95 flex items-center gap-2">
+                    <span className="text-lg leading-none">📄</span> PDF
+                  </button>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* THE SEARCH BAR */}
+          {attendanceList.length > 0 && (
+            <div className="mb-6">
+              <div className="relative max-w-md">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder="Search by Name or Roll No..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 block pl-12 p-3 font-medium transition-all"
+                />
+              </div>
+            </div>
+          )}
+
           {attendanceList.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
+            <div className="text-center py-16 text-slate-400 my-auto">
               <div className="text-5xl mb-4">📝</div>
               <p className="font-medium">No one has checked in yet.</p>
             </div>
+          ) : filteredAttendance.length === 0 ? (
+            <div className="text-center py-16 text-slate-400 my-auto">
+              <div className="text-4xl mb-4">🕵️‍♂️</div>
+              <p className="font-medium">No students found matching "{searchTerm}"</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-y-auto flex-1 pr-2 custom-scrollbar" style={{ maxHeight: '400px' }}>
               <table className="w-full text-left border-collapse">
-                <thead>
+                <thead className="sticky top-0 bg-white shadow-[0_4px_10px_-4px_rgba(0,0,0,0.05)] z-10">
                   <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
                     <th className="py-4 px-4">Student Name</th>
                     <th className="py-4 px-4">Roll No</th>
@@ -207,7 +341,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {attendanceList.map((record) => (
+                  {filteredAttendance.map((record) => (
                     <tr key={record.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-4 font-bold text-slate-800">{record.name}</td>
                       <td className="py-4 px-4 text-slate-500 font-medium">{record.student_id}</td>

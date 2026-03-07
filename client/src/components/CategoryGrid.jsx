@@ -1,9 +1,9 @@
 const CategoryGrid = ({ onSelect }) => {
   const categories = [
     { id: 'CLASS', label: 'Classes', icon: '📚', color: 'bg-blue-600', desc: 'Academic Sessions' },
-    { id: 'TECH_FEST', label: 'Tech Fest', icon: '🛠️', color: 'bg-purple-600', desc: 'Workshops & Events' },
+    { id: 'TECH_FEST', label: 'Tech Fest', icon: '🛠️', color: 'bg-purple-600', desc: 'Competitions & Events' },
     { id: 'OUTBOUND', label: 'Outbound', icon: '🚀', color: 'bg-orange-500', desc: 'Industrial Visits' },
-    { id: 'EXTRA_CURRICULAR', label: 'Extra Curricular', icon: '🎨', color: 'bg-pink-600', desc: 'Sports & Arts' }
+    { id: 'EXTRA_CURRICULAR', label: 'Extra Curricular', icon: '🎨', color: 'bg-pink-600', desc: 'Cultural activities and volunteering' }
   ];
 
   return (

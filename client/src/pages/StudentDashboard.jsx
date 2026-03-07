@@ -6,15 +6,22 @@ import toast, { Toaster } from "react-hot-toast";
 function StudentDashboard() {
   const navigate = useNavigate();
 
-  // 🔥 THE FRONTEND BOUNCER - Looks for studentToken
+  // 🔥 THE FRONTEND BOUNCER - Prevents Admin/Student Clashing
   useEffect(() => {
-    const token = localStorage.getItem('studentToken');
-    if (!token) {
+    const role = localStorage.getItem('userRole');
+    if (role !== 'STUDENT') {
+      localStorage.clear(); 
       navigate('/student-login'); 
     }
   }, [navigate]);
   
-  const [activeTab, setActiveTab] = useState('home'); 
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem('studentActiveTab') || 'home';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('studentActiveTab', activeTab);
+  }, [activeTab]);
   const [popupData, setPopupData] = useState(null); 
   
   const [stats, setStats] = useState({ percentage: 0, attended: 0, total: 0 });
@@ -25,8 +32,8 @@ function StudentDashboard() {
   // 🔥 Read the specific studentId
   const studentId = localStorage.getItem("studentId") || "Student";
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileData, setProfileData] = useState({ name: studentId, email: '' });
-  
+  const [profileData, setProfileData] = useState({ name: studentId, email: '', batch: 'Loading...' });
+
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
 
@@ -56,7 +63,11 @@ function StudentDashboard() {
       });
       if (response.ok) {
         const data = await response.json();
-        setProfileData({ name: data.name || studentId, email: data.email || '' });
+        setProfileData({ 
+          name: data.name || studentId, 
+          email: data.email || '',
+          batch: data.batch || 'Unassigned' //it saves the batch!
+        });
       }
     } catch (error) {
       console.error("Failed to fetch profile data");
@@ -176,9 +187,10 @@ function StudentDashboard() {
   };
 
   const handleLogout = () => {
-    // 🔥 Clear specific student memory
     localStorage.removeItem('studentToken');
     localStorage.removeItem('studentId');
+    localStorage.removeItem('userRole');
+    sessionStorage.clear(); // 🔥 Clears the saved tab when they log out
     navigate('/student-login');
   };
 
@@ -299,7 +311,18 @@ function StudentDashboard() {
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Roll Number</label>
-            <p className="text-lg font-semibold text-slate-800 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100">{studentId} <span className="text-xs text-slate-400 ml-2 font-normal">(System Locked)</span></p>
+            <p className="text-lg font-semibold text-slate-800 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100 flex items-center justify-between">
+              <span>{studentId}</span> 
+              <span className="text-xs text-slate-400 font-normal px-2 py-1 bg-slate-200/50 rounded-md">System Locked</span>
+            </p>
+          </div>
+        
+          <div>
+            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Assigned Batch</label>
+            <p className="text-lg font-semibold text-slate-800 bg-slate-50 px-4 py-3 rounded-xl border border-slate-100 flex items-center justify-between">
+              <span>{profileData.batch}</span>
+              <span className="text-xs text-slate-400 font-normal px-2 py-1 bg-slate-200/50 rounded-md">System Locked</span>
+            </p>
           </div>
         </div>
         {isEditingProfile && (
@@ -340,10 +363,13 @@ function StudentDashboard() {
     </div>
   );
 
+  // 🔥 UI FIX: The wrapper uses `overflow-x-hidden` and `min-h-screen`
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans">
+    // 🔥 1. THE WRAPPER: Locked to exactly 'h-screen' and 'overflow-hidden' so the browser NEVER bounces
+    <div className="h-screen w-full bg-slate-50 flex flex-col md:flex-row font-sans overflow-hidden">
       <Toaster position="top-center" />
 
+      {/* Scan Result Modal */}
       {popupData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-[2rem] p-8 max-w-sm w-full text-center shadow-2xl">
@@ -359,7 +385,8 @@ function StudentDashboard() {
         </div>
       )}
 
-      <aside className="hidden md:flex w-72 bg-green-900 text-green-50 border-r border-green-800 flex-col h-screen sticky top-0 shadow-2xl z-20">
+      {/* 🔥 2. THE SIDEBAR: Set to exactly 'h-full' of the locked wrapper. (Removed sticky top-0) */}
+      <aside className="hidden md:flex w-72 bg-green-900 text-green-50 border-r border-green-800 flex-col h-full shadow-2xl z-20">
         <div className="p-8 pb-10">
           <h1 className="text-3xl font-black text-white tracking-tight">FCI Portal</h1>
           <p className="text-xs font-bold text-green-300 tracking-widest uppercase mt-1">Student Access</p>
@@ -382,14 +409,16 @@ function StudentDashboard() {
         </div>
       </aside>
 
-      <main className="flex-1 p-4 sm:p-8 md:p-12 overflow-y-auto">
-        <div className="max-w-4xl mx-auto w-full">
+      {/* 🔥 3. THE MAIN CONTENT: Added 'overflow-y-auto' so THIS is the only box that scrolls! */}
+      <main className="flex-1 p-4 sm:p-8 md:p-12 bg-slate-50 h-full overflow-y-auto relative">
+        <div className="max-w-4xl mx-auto w-full pb-20">
           {activeTab === 'home' && renderHome()}
           {activeTab === 'scan' && renderScanner()}
           {activeTab === 'profile' && renderProfile()}
         </div>
       </main>
 
+      {/* MOBILE BOTTOM TAB BAR */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 pb-safe z-40 px-6 py-3 flex justify-between items-center shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === 'home' ? 'text-green-600' : 'text-slate-400'}`}>
           <span className="text-2xl">📊</span>

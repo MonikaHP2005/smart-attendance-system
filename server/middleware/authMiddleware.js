@@ -25,3 +25,21 @@ export const verifyToken = (req, res, next) => {
         return res.status(403).json({ message: "Invalid or Expired Token." });
     }
 };
+
+// 🔥 NEW: Allows both Admins and Organisers to pass
+export const verifyStaff = (req, res, next) => {
+    // req.user is set by your verifyToken function
+    if (req.user.role === 'admin' || req.user.role === 'organiser') {
+        next(); // They are allowed, let them through!
+    } else {
+        return res.status(403).json({ message: "Access Denied. Faculty and Staff only." });
+    }
+};
+
+// If you have an isAdmin middleware, keep it! It protects your "Add Organiser" route.
+export const isAdmin = (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Access Denied. Super Admin only." });
+    }
+    next();
+};
