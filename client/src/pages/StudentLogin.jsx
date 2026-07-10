@@ -11,7 +11,7 @@ const StudentLogin = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/student-login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/student-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, password }),

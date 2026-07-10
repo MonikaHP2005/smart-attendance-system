@@ -44,7 +44,7 @@ function StudentDashboard() {
     if (!studentId || studentId === "Student") return; 
     try {
       const token = localStorage.getItem('studentToken'); 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/events/student-stats/${studentId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/student-stats/${studentId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -61,7 +61,7 @@ function StudentDashboard() {
     if (!studentId || studentId === "Student") return;
     try {
       const token = localStorage.getItem('studentToken'); 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/profile/${studentId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile/${studentId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -97,7 +97,7 @@ function StudentDashboard() {
         async (position) => {
           try {
             const token = localStorage.getItem('studentToken'); 
-            const response = await fetch("${process.env.REACT_APP_API_URL}/api/events/attend", {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/attend`, {
               method: "POST",
               headers: { 
                 "Content-Type": "application/json",
@@ -139,7 +139,7 @@ function StudentDashboard() {
   const handleSaveProfile = async () => {
     try {
       const token = localStorage.getItem('studentToken'); 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/profile/${studentId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile/${studentId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ function StudentDashboard() {
     }
     try {
       const token = localStorage.getItem('studentToken'); 
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/change-password/${studentId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/change-password/${studentId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ const AddOrganiserForm = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/register-organiser', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/register-organiser`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

@@ -16,7 +16,7 @@ const OrganiserProfile = () => {
     const fetchProfile = useCallback(async () => {
         try {
             const token = localStorage.getItem('adminToken');
-            const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/profile/${organiserId}`, {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile/${organiserId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await response.json();
@@ -41,7 +41,7 @@ const OrganiserProfile = () => {
     try {
       const token = localStorage.getItem('adminToken');
       // 🔥 Ensure this URL matches your backend route exactly!
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/profile/${formData.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/profile/${formData.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

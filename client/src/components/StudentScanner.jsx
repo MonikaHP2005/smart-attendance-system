@@ -37,7 +37,7 @@ const StudentScanner = ({ onBack, onScanSuccess, studentId }) => {
           const studentLon = position.coords.longitude;
 
           try {
-            const response = await fetch("${process.env.REACT_APP_API_URL}/api/events/attend", {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/attend`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ eventId, qrToken, studentLat, studentLon, studentId }),
