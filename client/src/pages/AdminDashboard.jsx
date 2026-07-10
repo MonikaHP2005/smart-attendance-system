@@ -109,7 +109,7 @@ function AdminDashboard() {
 
   const fetchEvents = useCallback(() => {
     const token = localStorage.getItem('adminToken');
-    fetch("${import.meta.env.VITE_API_URL}/api/events", {
+    fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())
