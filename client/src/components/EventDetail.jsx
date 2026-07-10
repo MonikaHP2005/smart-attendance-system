@@ -20,7 +20,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
     if (!event) return;
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`http://localhost:5000/api/events/${event.id}/attendance`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/events/${event.id}/attendance`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -79,7 +79,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   const sendGenerateRequest = async (latitude, longitude) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`http://localhost:5000/api/events/${event.id}/generate-qr`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/events/${event.id}/generate-qr`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ const EventDetail = ({ event, onBack, onUpdate }) => {
   const handleCloseEvent = async (isAutoClose = false) => {
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch(`http://localhost:5000/api/events/${event.id}/close`, { 
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/events/${event.id}/close`, { 
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });

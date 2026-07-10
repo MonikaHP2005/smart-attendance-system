@@ -118,14 +118,14 @@ export const markAttendance = async (req, res) => {
         
         const student = students[0];
 
-        // 🔥 3. THE BOUNCER: COMPARE BATCHES
+        // COMPARE BATCHES
         if (event.batch !== student.batch) {
             return res.status(403).json({ 
                 message: `Access Denied: This session is for ${event.batch}. You belong to ${student.batch}.` 
             });
         }
 
-        // 📍 4. GPS GEOFENCE CHECK (Updated for Online Classes)
+        //GPS GEOFENCE CHECK (Updated for Online Classes)
         // Check if the Organiser saved their location (Physical Class)
         if (event.latitude && event.longitude) {
             
@@ -148,10 +148,10 @@ export const markAttendance = async (req, res) => {
                 });
             }
         }
-        // 🔥 MAGIC FIX: If event.latitude is NULL (Online Class), it skips the entire block above!
+        // If event.latitude is NULL (Online Class), it skips the entire block above!
         // No distance calculation happens, and it proceeds directly to marking attendance.
 
-        // 5. PROCESS ATTENDANCE (Check-in vs Check-out)
+        //PROCESS ATTENDANCE (Check-in vs Check-out)
         const [existingRecord] = await db.query(
             'SELECT id, check_out_time FROM attendance WHERE event_id = ? AND student_id = ?',
             [eventId, studentId]
@@ -212,15 +212,14 @@ export const getStudentStats = async (req, res) => {
         );
         let totalClasses = totalResult[0].total || 0;
 
-        // 🔥 FIX 1: Remove strict batch/time filters so it perfectly matches their History list
+        // 
         const [attendedResult] = await db.query(
             'SELECT COUNT(DISTINCT event_id) as attended FROM attendance WHERE student_id = ?', 
             [studentId]
         );
         const attendedClasses = attendedResult[0].attended || 0;
 
-        // 🔥 FIX 2: Safety Check. If they attended an early or cross-batch class, 
-        // prevent the percentage from breaking 100% (e.g., 3/2 -> 150%)
+        // If they attended an early or cross-batch class, prevent the percentage from breaking 100% (e.g., 3/2 -> 150%)
         if (totalClasses < attendedClasses) {
             totalClasses = attendedClasses;
         }

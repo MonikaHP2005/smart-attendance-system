@@ -11,7 +11,7 @@ const StudentLogin = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/student-login', {
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/student-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, password }),
@@ -62,7 +62,10 @@ const StudentLogin = () => {
         <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg py-4 rounded-xl transition-all hover:shadow-lg hover:shadow-emerald-500/30 active:scale-[0.98]">Log In</button>
       </form>
       <div className="mt-6 text-center">
-         <p className="text-slate-500 text-sm font-medium">Don't have an account? <Link to="/student-register" className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline transition-colors">Sign up here</Link></p>
+        <p className="text-slate-500 text-sm font-medium">Don't have an account? 
+          <Link to="/student-register" className="text-emerald-600 hover:text-emerald-800 font-bold hover:underline transition-colors">Sign up here
+          </Link>
+        </p>
       </div>
       <div className="mt-6 text-center pb-2">
          <button onClick={() => navigate("/")} className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs px-5 py-2.5 rounded-full transition-all flex items-center justify-center gap-2 mx-auto hover:shadow-sm active:scale-95">Back to Main Portal</button>

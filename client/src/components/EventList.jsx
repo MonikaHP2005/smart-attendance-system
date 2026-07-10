@@ -4,7 +4,7 @@ const EventList = ({ events, category, batch, onBack, onSelect }) => {
   // Add state to track sorting order ('desc' = newest first, 'asc' = oldest first)
   const [sortOrder, setSortOrder] = useState('desc');
   
-  // 🔥 NEW: State to remember the search term
+  //State to remember the search term
   const [searchTerm, setSearchTerm] = useState('');
 
   // 1. Create a sorted copy of the events array
@@ -15,7 +15,7 @@ const EventList = ({ events, category, batch, onBack, onSelect }) => {
     return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
   });
 
-  // 🔥 2. NEW: Filter the sorted events by the search term
+  //NEW: Filter the sorted events by the search term
   const filteredEvents = sortedEvents.filter((event) => {
     return event.title.toLowerCase().includes(searchTerm.toLowerCase());
   });

@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 
 // ==========================================
-// 1. STUDENT SPECIFIC LOGIN
+// STUDENT SPECIFIC LOGIN
 // ==========================================
 export const studentLogin = async (req, res) => {
     try {
@@ -38,7 +38,7 @@ export const studentLogin = async (req, res) => {
 };
 
 // ==========================================
-// 2. ADMIN SPECIFIC LOGIN
+// ADMIN SPECIFIC LOGIN
 // ==========================================
 export const adminLogin = async (req, res) => {
     try {
@@ -73,42 +73,67 @@ export const adminLogin = async (req, res) => {
 };
 
 // ==========================================
-// 3. REGISTER NEW STUDENT
+// REGISTER NEW STUDENT
 // ==========================================
 export const register = async (req, res) => {
     try {
-        const { studentId, name, email, password, batch } = req.body;
+        // id, name, email, password
+        const { studentId, name, email, password } = req.body;
 
-        if (!studentId || !name || !email || !password || !batch) {
+        // 2. Guardrail check
+        if (!studentId || !name || !email || !password) {
             return res.status(400).json({ message: "All fields are required." });
         }
 
-        const [existingUsers] = await db.query(
-            'SELECT * FROM users WHERE id = ? OR email = ?', 
-            [studentId, email]
+        // 3. WHITELIST VERIFICATION
+        const [whitelist] = await db.query(
+            'SELECT * FROM student_whitelist WHERE roll_number = ?', 
+            [studentId]
         );
-        
-        if (existingUsers.length > 0) {
-            return res.status(400).json({ message: "Student ID or Email already exists." });
+
+        if (whitelist.length === 0) {
+            return res.status(403).json({ message: "Access Denied: Roll Number not found." });
         }
 
+        const studentRecord = whitelist[0];
+
+        // 4. PREVENT DUPLICATES: Check if this roll number was already used
+        if (studentRecord.is_registered) {
+            return res.status(403).json({ message: "An account has already been created for this Roll Number." });
+        }
+
+        // 5. Hash the password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
+        // 6. INSERT USER: Notice we use 'studentRecord.pre_assigned_batch' here!
         await db.execute(
             'INSERT INTO users (id, name, email, password, role, batch) VALUES (?, ?, ?, ?, ?, ?)',
-            [studentId, name, email, hashedPassword, 'student', batch]
+            [studentId, name, email, hashedPassword, 'student', studentRecord.pre_assigned_batch]
+        );
+
+        // 7. SECURE THE ID: Lock the roll number so nobody else can register with it
+        await db.execute(
+            'UPDATE student_whitelist SET is_registered = TRUE WHERE roll_number = ?',
+            [studentId]
         );
 
         res.status(201).json({ message: "Registration successful! You can now log in." });
+
     } catch (error) {
         console.error("Registration Error:", error);
+        
+        // Catch duplicate emails specifically
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ message: "This email address is already in use." });
+        }
+
         res.status(500).json({ message: "Server error during registration." });
     }
 };
 
 // ==========================================
-// 4. GET USER PROFILE
+// GET USER PROFILE
 // ==========================================
 export const getProfile = async (req, res) => {
     try {

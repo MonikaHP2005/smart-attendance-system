@@ -8,7 +8,6 @@ const StudentRegister = () => {
     studentId: '',
     name: '',
     email: '',
-    batch: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -18,16 +17,75 @@ const StudentRegister = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // const handleRegister = async (e) => {
+  //   e.preventDefault();
+  //   try {
+  //     const response = await fetch('http://localhost:5000/api/auth/register', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify(formData),
+  //     });
+
+  //     const data = await response.json();
+
+  //     if (response.ok) {
+  //       toast.success("Registration Successful!");
+  //       setTimeout(() => navigate('/student-login'), 1500);
+  //     } else {
+  //       toast.error(data.message || 'Registration failed');
+  //     }
+  //   } catch (err) {
+  //     toast.error('Cannot connect to the server.');
+  //   }
+  // };
+
+
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    // 1. Extract variables from formData state
+    const { name, email, password } = formData;
+
+    // 2. GUARDRAIL: Check for Empty Fields
+    if (!name || !email || !password) {
+      toast.error("Please fill in all the fields.");
+      return; 
+    }
+
+    // 3. GUARDRAIL: The Email Pattern
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    // 4. GUARDRAIL: Password Strength
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters long.");
+      return;
+    }
+
+    const hasNumber = /\d/;
+    if (!hasNumber.test(password)) {
+      toast.error("Password must contain at least one number.");
+      return;
+    }
+
+    // 5. If it passes all tests, show a loading state
+    toast.loading("Creating your account...", { id: "register-toast" });
+
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      // Make sure to use your actual backend endpoint here!
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
       const data = await response.json();
+      
+      // Clear the loading toast before showing the result
+      toast.dismiss("register-toast"); 
 
       if (response.ok) {
         toast.success("Registration Successful!");
@@ -36,9 +94,12 @@ const StudentRegister = () => {
         toast.error(data.message || 'Registration failed');
       }
     } catch (err) {
+      toast.dismiss("register-toast");
       toast.error('Cannot connect to the server.');
     }
   };
+
+
 
   // ONLY THE UI HAS BEEN UPGRADED BELOW
   return (
@@ -88,20 +149,6 @@ const StudentRegister = () => {
         </div>
 
         {/* Batch / Section */}
-        <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-widest">
-            Batch 
-          </label>
-          <input 
-            type="text" 
-            name="batch" 
-            required 
-            value={formData.batch} 
-            onChange={handleChange}
-            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-semibold text-slate-900 text-sm"
-            placeholder="e.g. B5" 
-          />
-        </div>
 
         {/* Email Address */}
         <div>
@@ -115,7 +162,7 @@ const StudentRegister = () => {
             value={formData.email} 
             onChange={handleChange}
             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-semibold text-slate-900 text-sm"
-            placeholder="student@college.edu" 
+            placeholder="example@gmail.com" 
           />
         </div>
         

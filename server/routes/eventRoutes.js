@@ -23,7 +23,7 @@ router.get('/:id/attendance', verifyToken, verifyStaff, getEventAttendance);
 
 
 // ==========================================
-// 🎓 STUDENT / SHARED ROUTES
+// STUDENT / SHARED ROUTES
 // ==========================================
 
 // Mark attendance (Student scans QR) - NO verifyStaff here, or students get blocked!

@@ -13,7 +13,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/events", eventRoutes); // Adjusted slightly for cleanliness
-app.use("/api/auth", authRoutes);    // 2. CONNECT YOUR LOGIN SYSTEM HERE
+app.use("/api/auth", authRoutes);    // For login system
 
 app.get("/", (req, res) => {
     res.send("Smart Attendance Server is running...");

@@ -29,7 +29,7 @@ const AdminProfile = () => {
   const handleSave = async () => {
     try {
       const token = sessionStorage.getItem('adminToken');
-      const response = await fetch(`http://localhost:5000/api/auth/profile/${adminId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/profile/${adminId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

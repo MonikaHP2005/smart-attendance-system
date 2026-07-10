@@ -21,7 +21,7 @@ const AddOrganiserForm = () => {
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem('adminToken');
-      const response = await fetch('http://localhost:5000/api/auth/register-organiser', {
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/register-organiser', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ function AdminDashboard() {
 
   const fetchEvents = useCallback(() => {
     const token = localStorage.getItem('adminToken');
-    fetch("http://localhost:5000/api/events", {
+    fetch("${process.env.REACT_APP_API_URL}/api/events", {
       headers: { 'Authorization': `Bearer ${token}` }
     })
       .then(res => res.json())

@@ -11,7 +11,7 @@ const AdminLogin = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/admin-login', {
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/admin-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminId, password }),
@@ -20,11 +20,11 @@ const AdminLogin = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // 🔥 STEP 1: Clear all previous session/local data to prevent role conflicts
+        // Clear all previous session/local data to prevent role conflicts
         localStorage.clear(); 
         sessionStorage.clear();
 
-        // 🔥 STEP 2: Save to localStorage for persistence across refreshes
+        //  Save to localStorage for persistence across refreshes
         localStorage.setItem('adminToken', data.token); 
         localStorage.setItem('adminId', data.user?.id || adminId); 
         localStorage.setItem('userRole', data.user?.role || 'admin'); 

@@ -12,8 +12,6 @@ export const verifyToken = (req, res, next) => {
 
     try {
         // 3. Verify the token using your secret key
-        // NOTE: In production, ALWAYS use process.env.JWT_SECRET. 
-        // Replace 'your_super_secret_key' with whatever string you used during the login generation!
         const verified = jwt.verify(token, process.env.JWT_SECRET || 'your_super_secret_key');
         
         // 4. Attach the decoded user payload to the request so the next function can use it
@@ -26,7 +24,7 @@ export const verifyToken = (req, res, next) => {
     }
 };
 
-// 🔥 NEW: Allows both Admins and Organisers to pass
+//  NEW: Allows both Admins and Organisers to pass
 export const verifyStaff = (req, res, next) => {
     // req.user is set by your verifyToken function
     if (req.user.role === 'admin' || req.user.role === 'organiser') {
@@ -36,7 +34,6 @@ export const verifyStaff = (req, res, next) => {
     }
 };
 
-// If you have an isAdmin middleware, keep it! It protects your "Add Organiser" route.
 export const isAdmin = (req, res, next) => {
     if (req.user.role !== 'admin') {
         return res.status(403).json({ message: "Access Denied. Super Admin only." });

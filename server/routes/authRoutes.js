@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-// 🔥 Import all cleaned controller functions
+// All the functions in controllers are imported and used here
 import { 
     register, 
     studentLogin, 
@@ -16,7 +16,7 @@ import db from '../config/db.js';
 const router = express.Router();
 
 // ==========================================
-// 🔓 PUBLIC ROUTES (Anyone can access)
+// PUBLIC ROUTES (Anyone can access)
 // ==========================================
 router.post('/register', register);
 router.post('/student-login', studentLogin);
@@ -24,7 +24,7 @@ router.post('/admin-login', adminLogin);
 router.post('/organiser-login', organiserLogin);
 
 // ==========================================
-// 🔒 PROTECTED ROUTES (Requires Token)
+// PROTECTED ROUTES (Requires Token)
 // ==========================================
 
 // 🔥 CLEANED: Uses the function from authController
